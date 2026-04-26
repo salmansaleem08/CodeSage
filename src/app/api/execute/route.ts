@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-const PISTON_ENDPOINT = "https://emkc.org/api/v2/piston/execute";
+const WANDBOX_ENDPOINT = "https://wandbox.org/api/compile.json";
 
 type ExecuteRequestBody = {
   language: "cpp" | "python";
@@ -10,9 +10,9 @@ type ExecuteRequestBody = {
 
 function getRuntime(language: ExecuteRequestBody["language"]) {
   if (language === "cpp") {
-    return { language: "cpp", version: "17.0.0" };
+    return { compiler: "gcc-13.2.0", options: "warning,gnu++17" };
   }
-  return { language: "python", version: "3.10.0" };
+  return { compiler: "cpython-3.10.15", options: "" };
 }
 
 export async function POST(request: Request) {
@@ -23,21 +23,20 @@ export async function POST(request: Request) {
     }
 
     const runtime = getRuntime(body.language);
-    const pistonPayload = {
-      language: runtime.language,
-      version: runtime.version,
-      files: [{ name: `main.${body.language === "cpp" ? "cpp" : "py"}`, content: body.code }],
+    const payload = {
+      compiler: runtime.compiler,
       stdin: body.stdin ?? "",
-      compile_timeout: 10000,
-      run_timeout: 10000
+      code: body.code,
+      options: runtime.options,
+      save: false
     };
 
-    const response = await fetch(PISTON_ENDPOINT, {
+    const response = await fetch(WANDBOX_ENDPOINT, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
       },
-      body: JSON.stringify(pistonPayload),
+      body: JSON.stringify(payload),
       cache: "no-store"
     });
 
@@ -46,11 +45,11 @@ export async function POST(request: Request) {
     }
 
     const result = await response.json();
-    const output = result?.run?.output ?? "";
-    const compileOutput = result?.compile?.output ?? "";
-    const runStderr = result?.run?.stderr ?? "";
-    const runStdout = result?.run?.stdout ?? "";
-    const code = result?.run?.code ?? 0;
+    const output = result?.program_output ?? "";
+    const compileOutput = [result?.compiler_output, result?.compiler_error].filter(Boolean).join("\n");
+    const runStderr = [result?.program_error, result?.program_message].filter(Boolean).join("\n");
+    const runStdout = result?.program_output ?? "";
+    const code = Number(result?.status ?? 1);
 
     return NextResponse.json({
       output,

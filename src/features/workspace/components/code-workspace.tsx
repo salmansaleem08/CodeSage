@@ -184,8 +184,8 @@ export function CodeWorkspace() {
   }
 
   return (
-    <section className="mx-auto grid w-full max-w-7xl gap-5 px-4 py-6 sm:px-6 md:px-10 lg:grid-cols-[1fr_1.2fr]">
-      <article className="space-y-4 rounded-xl border border-border bg-card p-5 shadow-sm">
+    <section className="mx-auto grid h-[calc(100vh-82px)] w-full max-w-7xl gap-4 overflow-hidden px-4 py-4 sm:px-6 md:px-10 lg:grid-cols-[0.9fr_1.4fr]">
+      <article className="space-y-4 overflow-y-auto rounded-xl border border-border bg-card p-5 shadow-sm">
         <h2 className="text-lg font-semibold">Problem Section</h2>
         <div className="space-y-2">
           <Label htmlFor="problem-title">Problem Title</Label>
@@ -229,7 +229,7 @@ export function CodeWorkspace() {
         </div>
       </article>
 
-      <article className="space-y-4">
+      <article className="grid min-h-0 grid-rows-[auto_auto_1fr] gap-4">
         <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="mb-4 flex flex-wrap items-center gap-2">
             <Button variant={language === "cpp" ? "default" : "outline"} onClick={() => switchLanguage("cpp")}>
@@ -255,7 +255,7 @@ export function CodeWorkspace() {
 
           <div className="overflow-hidden rounded-lg border border-border">
             <Editor
-              height="380px"
+              height="38vh"
               language={language === "cpp" ? "cpp" : "python"}
               value={code}
               onChange={(value) => setCode(value ?? "")}
@@ -338,13 +338,13 @@ export function CodeWorkspace() {
           </p>
         </section>
 
-        <section className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <section className="min-h-0 rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="mb-3 flex items-center gap-2">
             <TerminalSquare className="size-4 text-primary" />
             <h3 className="font-semibold">Output & Error Console</h3>
           </div>
           {execution.error ? <p className="mb-3 text-sm text-destructive">{execution.error}</p> : null}
-          <div className="space-y-3 text-sm">
+          <div className="max-h-full space-y-3 overflow-y-auto text-sm">
             <div className="rounded-md border border-border bg-background/70 p-3">
               <p className="mb-1 text-xs font-medium text-muted-foreground">Compile Logs</p>
               <pre className="overflow-x-auto whitespace-pre-wrap">{execution.compileOutput || "No compile logs."}</pre>
