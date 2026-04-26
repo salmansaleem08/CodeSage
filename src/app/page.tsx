@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Brain, ChevronRight, Code2, Sparkles, Target } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/server";
 
 const features = [
   {
@@ -21,7 +23,16 @@ const features = [
   }
 ];
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect("/dashboard");
+  }
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-background text-foreground">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_10%_10%,_color-mix(in_oklab,var(--primary)_20%,transparent),transparent_30%),radial-gradient(circle_at_90%_20%,_color-mix(in_oklab,var(--secondary)_18%,transparent),transparent_30%)]" />

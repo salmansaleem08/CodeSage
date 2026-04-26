@@ -1,8 +1,19 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { AuthForm } from "@/features/auth/components/auth-form";
+import { createClient } from "@/lib/supabase/server";
 
-export default function SignupPage() {
+export default async function SignupPage() {
+  const supabase = await createClient();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (user) {
+    redirect("/dashboard");
+  }
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-background px-6 py-16 md:px-10">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_right,_color-mix(in_oklab,var(--secondary)_20%,transparent),transparent_60%)]" />

@@ -44,7 +44,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           return;
         }
         setMessage("Welcome back. Redirecting...");
-        router.push("/");
+        router.push("/dashboard");
         router.refresh();
         return;
       }
@@ -57,9 +57,9 @@ export function AuthForm({ mode }: AuthFormProps) {
         setError(signUpError.message);
         return;
       }
-      setMessage("Account created. Please verify your email before logging in.");
-      setEmail("");
-      setPassword("");
+      setMessage("Account created. Redirecting to your dashboard...");
+      router.push("/dashboard");
+      router.refresh();
     } finally {
       setLoading(false);
     }
