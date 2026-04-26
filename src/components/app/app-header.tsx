@@ -45,6 +45,9 @@ export async function AppHeader() {
             <Link href="/settings" className="rounded-md px-3 py-2 text-foreground hover:bg-accent">
               Settings
             </Link>
+            <Link href="/editor" className="rounded-md px-3 py-2 text-foreground hover:bg-accent">
+              Editor
+            </Link>
             <Link href="/feed" className="rounded-md px-3 py-2 text-foreground hover:bg-accent">
               Feed
             </Link>
