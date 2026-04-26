@@ -87,6 +87,65 @@ export type Database = {
         };
         Relationships: [];
       };
+      feed_events: {
+        Row: {
+          id: number;
+          actor_id: string;
+          event_type: "daily_practice" | "streak_milestone" | "accuracy_improved" | "problems_solved_milestone";
+          title: string;
+          description: string;
+          metadata: Json;
+          event_key: string;
+          created_at: string;
+        };
+        Insert: {
+          actor_id: string;
+          event_type: "daily_practice" | "streak_milestone" | "accuracy_improved" | "problems_solved_milestone";
+          title: string;
+          description: string;
+          metadata?: Json;
+          event_key: string;
+          created_at?: string;
+        };
+        Update: {
+          title?: string;
+          description?: string;
+          metadata?: Json;
+        };
+        Relationships: [];
+      };
+      feed_reactions: {
+        Row: {
+          id: number;
+          event_id: number;
+          user_id: string;
+          reaction: "clap" | "fire" | "insight";
+          created_at: string;
+        };
+        Insert: {
+          event_id: number;
+          user_id: string;
+          reaction: "clap" | "fire" | "insight";
+        };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
+      feed_comments: {
+        Row: {
+          id: number;
+          event_id: number;
+          user_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          event_id: number;
+          user_id: string;
+          body: string;
+        };
+        Update: Record<string, never>;
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;

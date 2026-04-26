@@ -50,7 +50,7 @@ export function FriendNetwork({ currentUserId, friends, incomingRequests }: Frie
     const { data, error } = await supabase
       .from("profiles")
       .select("id,full_name,email,avatar_url")
-      .or(`full_name.ilike.%${term}%,email.ilike.%${term}%`)
+      .or(`full_name.ilike.%${term}%,email.ilike.%${term}%,bio.ilike.%${term}%,degree.ilike.%${term}%`)
       .neq("id", currentUserId)
       .limit(20);
     setSearching(false);

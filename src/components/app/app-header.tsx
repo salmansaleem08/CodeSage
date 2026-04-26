@@ -45,6 +45,9 @@ export async function AppHeader() {
             <Link href="/settings" className="rounded-md px-3 py-2 text-foreground hover:bg-accent">
               Settings
             </Link>
+            <Link href="/feed" className="rounded-md px-3 py-2 text-foreground hover:bg-accent">
+              Feed
+            </Link>
           </nav>
         </div>
         <div className="flex items-center gap-2 sm:gap-4">
