@@ -19,9 +19,14 @@ export async function createClient() {
           options?: Parameters<typeof cookieStore.set>[2];
         }>
       ) {
-        cookiesToSet.forEach(({ name, value, options }) => {
-          cookieStore.set(name, value, options);
-        });
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // Server Components cannot always mutate cookies during render.
+          // In those cases, middleware or auth route handlers should refresh session cookies.
+        }
       }
     }
   });
