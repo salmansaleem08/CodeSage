@@ -41,14 +41,17 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
   const [friendEmail, setFriendEmail] = useState("");
   const [status, setStatus] = useState("");
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   async function handleAvatarUpload(file: File) {
+    setUploading(true);
     const extension = file.name.split(".").pop() ?? "jpg";
     const filePath = `${userId}/avatar.${extension}`;
 
     const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file, { upsert: true });
     if (uploadError) {
       setStatus(uploadError.message);
+      setUploading(false);
       return;
     }
 
@@ -64,10 +67,12 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
 
     if (updateError) {
       setStatus(updateError.message);
+      setUploading(false);
       return;
     }
 
     setAvatarUrl(publicUrl);
+    setUploading(false);
     setStatus("Profile photo updated.");
     router.refresh();
   }
@@ -130,7 +135,7 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
     const { error: insertError } = await supabase.from("friendships").insert({
       user_id: userId,
       friend_id: friendProfile.id,
-      status: "accepted"
+      status: "pending"
     });
 
     if (insertError && !insertError.message.includes("duplicate")) {
@@ -139,7 +144,7 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
     }
 
     setFriendEmail("");
-    setStatus("Friend added successfully.");
+    setStatus("Friend request sent.");
     router.refresh();
   }
 
@@ -148,23 +153,36 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
       <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
         <h2 className="mb-4 text-lg font-semibold">Profile Image</h2>
         <div className="flex items-center gap-4">
-          {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt="Profile avatar" className="size-16 rounded-full border border-border object-cover" />
-          ) : (
-            <div className="grid size-16 place-content-center rounded-full border border-border bg-background">
-              <UserCircle2 className="size-8 text-muted-foreground" />
-            </div>
-          )}
-          <Input
-            type="file"
-            accept="image/*"
-            className="h-11"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              if (file) void handleAvatarUpload(file);
-            }}
-          />
+          <label className="group relative cursor-pointer">
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleAvatarUpload(file);
+              }}
+            />
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt="Profile avatar"
+                className="size-20 rounded-full border border-border object-cover transition-opacity group-hover:opacity-80"
+              />
+            ) : (
+              <div className="grid size-20 place-content-center rounded-full border border-border bg-background transition-colors group-hover:bg-accent">
+                <UserCircle2 className="size-9 text-muted-foreground" />
+              </div>
+            )}
+            <span className="absolute -right-1 -bottom-1 rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold">
+              Edit
+            </span>
+          </label>
+          <div className="space-y-1">
+            <p className="text-sm font-medium">Click avatar to change photo</p>
+            <p className="text-xs text-muted-foreground">{uploading ? "Uploading..." : "PNG / JPG recommended"}</p>
+          </div>
         </div>
       </section>
 
@@ -228,7 +246,7 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
       </form>
 
       <form onSubmit={handleAddFriend} className="rounded-xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold">Add Friend</h2>
+        <h2 className="mb-4 text-lg font-semibold">Quick Friend Request</h2>
         <div className="flex flex-col gap-3 md:flex-row">
           <Input
             type="email"

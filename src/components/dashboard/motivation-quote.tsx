@@ -50,9 +50,12 @@ export function MotivationQuote() {
   const quote = useMemo(() => getCurrentQuote(), []);
 
   return (
-    <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-      <p className="mb-2 text-sm font-medium text-primary">Motivation</p>
-      <p className="text-base text-foreground">&ldquo;{quote}&rdquo;</p>
+    <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm md:p-8">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,_color-mix(in_oklab,var(--primary)_18%,transparent),transparent_55%),radial-gradient(circle_at_bottom_left,_color-mix(in_oklab,var(--secondary)_20%,transparent),transparent_55%)]" />
+      <div className="relative">
+        <p className="mb-3 text-xs font-semibold tracking-[0.2em] text-primary uppercase">Daily Motivation</p>
+        <p className="max-w-3xl text-lg leading-relaxed font-medium text-foreground md:text-xl">&ldquo;{quote}&rdquo;</p>
+      </div>
     </section>
   );
 }

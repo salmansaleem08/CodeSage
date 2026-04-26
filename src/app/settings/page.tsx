@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { Medal, Settings2, Star } from "lucide-react";
 
 import { AppHeader } from "@/components/app/app-header";
+import { FriendNetwork } from "@/components/friends/friend-network";
 import { ProfileSettingsForm } from "@/components/settings/profile-settings-form";
 import { createClient } from "@/lib/supabase/server";
 
@@ -11,6 +12,7 @@ type AttemptRow = {
 };
 
 type FriendshipRow = {
+  id: number;
   user_id: string;
   friend_id: string;
   status: "pending" | "accepted";
@@ -20,6 +22,7 @@ type FriendProfileRow = {
   id: string;
   full_name: string;
   email: string;
+  avatar_url: string | null;
 };
 
 export default async function SettingsPage() {
@@ -78,7 +81,7 @@ export default async function SettingsPage() {
 
   const { data: friendships } = await supabase
     .from("friendships")
-    .select("user_id,friend_id,status")
+    .select("id,user_id,friend_id,status")
     .or(`user_id.eq.${user.id},friend_id.eq.${user.id}`)
     .eq("status", "accepted");
 
@@ -91,7 +94,7 @@ export default async function SettingsPage() {
   );
 
   const { data: publicProfilesData } = friendIds.length
-    ? await supabase.from("profiles").select("id,full_name,email").in("id", friendIds)
+    ? await supabase.from("profiles").select("id,full_name,email,avatar_url").in("id", friendIds)
     : { data: [] };
   const publicProfiles = (publicProfilesData ?? []) as FriendProfileRow[];
 
@@ -107,16 +110,41 @@ export default async function SettingsPage() {
       return {
         id: friend.id,
         name: friend.full_name || friend.email.split("@")[0],
+        email: friend.email,
         solved,
-        rating
+        rating,
+        avatarUrl: friend.avatar_url
       };
     })
   );
 
+  const { data: incomingRequestsRaw } = await supabase
+    .from("friendships")
+    .select("id,user_id,friend_id,status")
+    .eq("friend_id", user.id)
+    .eq("status", "pending");
+  const incomingRequests = (incomingRequestsRaw ?? []) as FriendshipRow[];
+  const requesterIds = incomingRequests.map((row) => row.user_id);
+  const { data: requesterProfilesRaw } = requesterIds.length
+    ? await supabase.from("profiles").select("id,full_name,email,avatar_url").in("id", requesterIds)
+    : { data: [] };
+  const requesterProfiles = new Map(
+    ((requesterProfilesRaw ?? []) as FriendProfileRow[]).map((profileRow) => [profileRow.id, profileRow])
+  );
+  const requestView = incomingRequests.map((request) => {
+    const requester = requesterProfiles.get(request.user_id);
+    return {
+      id: request.id,
+      requesterId: request.user_id,
+      requesterName: requester?.full_name || requester?.email?.split("@")[0] || "Student",
+      requesterEmail: requester?.email || ""
+    };
+  });
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <section className="mx-auto w-full max-w-7xl space-y-8 px-6 py-8 md:px-10">
+      <section className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 sm:px-6 md:px-10 md:py-8">
         <ProfileSettingsForm userId={user.id} initialProfile={profile} />
 
         <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -137,28 +165,7 @@ export default async function SettingsPage() {
           })}
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-2">
-          <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold">Your Friends</h2>
-            <div className="space-y-3">
-              {publicProfilesWithStats.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No friends yet. Add by email in the settings form above.</p>
-              ) : null}
-              {publicProfilesWithStats.map((friend) => (
-                <div
-                  key={friend.id}
-                  className="flex items-center justify-between rounded-lg border border-border bg-background/60 px-4 py-3"
-                >
-                  <div>
-                    <p className="font-medium">{friend.name}</p>
-                    <p className="text-xs text-muted-foreground">{friend.solved} solved</p>
-                  </div>
-                  <p className="text-sm font-semibold text-primary">{friend.rating}</p>
-                </div>
-              ))}
-            </div>
-          </article>
-        </section>
+        <FriendNetwork currentUserId={user.id} friends={publicProfilesWithStats} incomingRequests={requestView} />
       </section>
     </main>
   );

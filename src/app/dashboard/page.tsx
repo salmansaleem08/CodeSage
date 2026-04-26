@@ -166,10 +166,11 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <section className="mx-auto w-full max-w-7xl space-y-8 px-6 py-8 md:px-10">
+      <section className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 sm:px-6 md:px-10 md:py-8">
+        <MotivationQuote />
         <div className="space-y-2">
           <p className="text-sm text-muted-foreground">Welcome back</p>
-          <h1 className="text-3xl font-bold tracking-tight">{profileName}</h1>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{profileName}</h1>
         </div>
 
         <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
@@ -207,7 +208,7 @@ export default async function DashboardPage() {
           />
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-[1.3fr_1fr]">
+        <section className="grid gap-5 lg:grid-cols-1">
           <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <h2 className="mb-4 text-lg font-semibold">Learning Insights</h2>
             <ul className="space-y-3 text-sm text-muted-foreground">
@@ -218,7 +219,6 @@ export default async function DashboardPage() {
               ))}
             </ul>
           </article>
-          <MotivationQuote />
         </section>
       </section>
     </main>
