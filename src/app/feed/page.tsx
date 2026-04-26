@@ -12,7 +12,9 @@ type AttemptRow = {
 };
 
 function dayKey(value: string | Date): string {
-  return new Date(value).toISOString().slice(0, 10);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
 }
 
 function computeStreak(correctAttempts: AttemptRow[]): number {

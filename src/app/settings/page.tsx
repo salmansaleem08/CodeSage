@@ -36,15 +36,6 @@ export default async function SettingsPage() {
     redirect("/login");
   }
 
-  await supabase.from("profiles").upsert(
-    {
-      id: user.id,
-      email: user.email ?? "",
-      full_name: user.user_metadata?.full_name ?? (user.email?.split("@")[0] ?? "Learner")
-    },
-    { onConflict: "id", ignoreDuplicates: true }
-  );
-
   const { data: profileRow } = await supabase
     .from("profiles")
     .select("full_name,email,bio,degree,interests,avatar_url,default_mode,default_hint_level,code_preference")
