@@ -1,8 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { UserCircle2 } from "lucide-react";
 
+import { ThemeToggle } from "@/components/app/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
+
+type HeaderProfile = {
+  avatar_url: string | null;
+};
 
 async function signOutAction() {
   "use server";
@@ -13,10 +19,17 @@ async function signOutAction() {
 }
 
 export async function AppHeader() {
-  const supabase = await createClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabase = (await createClient()) as any;
   const {
     data: { user }
   } = await supabase.auth.getUser();
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("avatar_url")
+    .eq("id", user?.id ?? "")
+    .maybeSingle();
+  const profile = profileData as HeaderProfile | null;
 
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
@@ -35,6 +48,19 @@ export async function AppHeader() {
           </nav>
         </div>
         <div className="flex items-center gap-4">
+          <ThemeToggle />
+          {profile?.avatar_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={profile.avatar_url}
+              alt="Profile avatar"
+              className="size-9 rounded-full border border-border object-cover"
+            />
+          ) : (
+            <div className="grid size-9 place-content-center rounded-full border border-border bg-background">
+              <UserCircle2 className="size-5 text-muted-foreground" />
+            </div>
+          )}
           <p className="hidden text-sm text-muted-foreground md:block">{user?.email ?? "Learner"}</p>
           <form action={signOutAction}>
             <Button variant="outline" className="h-9">
