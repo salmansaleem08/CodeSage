@@ -720,7 +720,7 @@ export function CodeWorkspace() {
       </section>
 
       <div className="flex min-h-0 flex-1 flex-col gap-4">
-        <section className="min-h-0 space-y-3 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-sm">
+        <section className="max-h-[34vh] min-h-[220px] space-y-3 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between gap-2">
             <h2 className="text-base font-semibold">Problem</h2>
             <div className="flex items-center gap-2">
@@ -789,7 +789,7 @@ export function CodeWorkspace() {
           </div>
         </section>
 
-        <section className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[1.45fr_1fr]">
+        <section className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[1.55fr_1fr]">
           <section className="flex min-h-0 flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <Button variant={language === "cpp" ? "default" : "outline"} onClick={() => switchLanguage("cpp")}>
