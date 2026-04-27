@@ -449,6 +449,12 @@ export function CodeWorkspace() {
   }
 
   async function requestGeminiHint(forAutomatic = false) {
+    const clampedSeedStep =
+      mode === "SEED"
+        ? seedSteps.length > 0
+          ? Math.min(Math.max(seedFrontier, 1), seedSteps.length)
+          : 1
+        : 1;
     const body = {
       mode,
       language,
@@ -457,8 +463,8 @@ export function CodeWorkspace() {
       hasCode: code.trim().length > 0 && code.trim() !== templates[language].trim(),
       userCode: code,
       userError: [execution.error, execution.stderr, execution.compileOutput].filter(Boolean).join("\n"),
-      step: mode === "SEED" ? seedFrontier : 1,
-      totalSteps: mode === "SEED" ? Math.max(seedSteps.length, 9) : 1,
+      step: clampedSeedStep,
+      totalSteps: mode === "SEED" ? Math.max(seedSteps.length, 1) : 1,
       helpClickNumber: mode === "SHADOW" ? shadowHelpClick + 1 : 1
     };
 
@@ -517,22 +523,11 @@ export function CodeWorkspace() {
         error: ""
       });
 
-      if (mode === "SEED" && seedStepsRef.current.length > 0 && (type === "run" || type === "submit")) {
-        setSeedFrontier((f) => {
-          const max = seedStepsRef.current.length;
-          const next = Math.min(f + 1, max + 1);
-          if (next !== f && next <= max) {
-            void persistFrontier(next);
-            setHintsUsed((h) => h + 1);
-          }
-          return next;
+      if (mode === "SEED" && seedStepsRef.current.length > 0 && hintDelivery === "automatic") {
+        queueMicrotask(() => {
+          const ed = editorRef.current;
+          if (ed) triggerInlineSuggest(ed);
         });
-        if (hintDelivery === "automatic") {
-          queueMicrotask(() => {
-            const ed = editorRef.current;
-            if (ed) triggerInlineSuggest(ed);
-          });
-        }
       }
 
       if (type === "submit" && hintDelivery === "automatic" && mode !== "SHADOW" && mode !== "SEED" && hasProblemText) {
