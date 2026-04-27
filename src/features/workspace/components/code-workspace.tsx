@@ -312,7 +312,8 @@ export function CodeWorkspace() {
           setSeedSteps(steps);
           const max = steps.length;
           const fs = typeof data.frontierStep === "number" ? data.frontierStep : 1;
-          setSeedFrontier(Math.min(Math.max(fs, 1), max));
+          const isFreshDraft = code.trim() === templates[language].trim();
+          setSeedFrontier(isFreshDraft ? 1 : Math.min(Math.max(fs, 1), max));
           setSeedError(null);
           setCurrentHint("");
         } catch {
