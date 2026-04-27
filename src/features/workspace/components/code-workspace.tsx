@@ -430,8 +430,8 @@ export function CodeWorkspace() {
   const handleSeedAccept = useCallback(() => {
     setSeedFrontier((f) => {
       const max = seedStepsRef.current.length;
-      const next = Math.min(f + 1, max);
-      if (next !== f) {
+      const next = Math.min(f + 1, max + 1);
+      if (next !== f && next <= max) {
         void persistFrontier(next);
         setHintsUsed((h) => h + 1);
       }
@@ -453,6 +453,7 @@ export function CodeWorkspace() {
         () => {
           if (modeRef.current !== "SEED") return null;
           const b = seedBundleRef.current;
+          if (b.frontier > b.steps.length) return null;
           const idx = b.frontier - 1;
           const body = b.steps[idx];
           if (!body) return null;
@@ -520,8 +521,8 @@ export function CodeWorkspace() {
       if (mode === "SEED" && seedStepsRef.current.length > 0 && (type === "run" || type === "submit")) {
         setSeedFrontier((f) => {
           const max = seedStepsRef.current.length;
-          const next = Math.min(f + 1, max);
-          if (next !== f) {
+          const next = Math.min(f + 1, max + 1);
+          if (next !== f && next <= max) {
             void persistFrontier(next);
             setHintsUsed((h) => h + 1);
           }
@@ -563,6 +564,10 @@ export function CodeWorkspace() {
         setCurrentHint(
           seedLoading ? "Getting your guided sequence ready…" : seedError ?? "Add problem details on the left to enable guidance."
         );
+        return;
+      }
+      if (seedFrontier > seedSteps.length) {
+        setCurrentHint("Great progress. You have completed all guided SEED steps for this problem.");
         return;
       }
       const ed = editorRef.current;

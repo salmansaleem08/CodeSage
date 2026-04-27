@@ -25,8 +25,7 @@ type SeedPlanParams = {
 
 function targetStepCount(specificity: number): number {
   if (specificity <= 2) return 12;
-  if (specificity <= 4) return 9;
-  return 7;
+  return 9;
 }
 
 export function buildSeedFallbackSteps(params: SeedPlanParams): string[] {
