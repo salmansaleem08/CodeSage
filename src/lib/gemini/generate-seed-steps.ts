@@ -34,22 +34,28 @@ export function buildSeedFallbackSteps(params: SeedPlanParams): string[] {
   const isStringProblem = /string|sentence|character|vowel|text/i.test(
     `${params.problemTitle} ${params.problemDescription} ${params.constraints}`
   );
-
-  const base = [
-    "Restate what the program must read and what it must print.",
-    "Pick a variable to store the full input value before processing it.",
-    "Initialize a counter so you can track how many matches you find.",
-    isStringProblem
-      ? "Loop through the text one character at a time and examine each character."
-      : "Loop through each required element once to process the input in order.",
-    isStringProblem
-      ? "Define the exact match rule (for vowels: a, e, i, o, u, including uppercase if needed)."
-      : "Define the exact condition that decides whether the current value should be counted.",
-    "When the condition is true, increase your counter.",
-    "After the loop, print only the final counter in the required output format.",
-    "Test with one simple case and one edge case to verify your logic.",
-    "If output is wrong, trace one iteration manually and compare expected vs actual state."
-  ];
+  const base = isStringProblem
+    ? [
+        "Programs begin from one fixed starting point. Think about where execution starts.",
+        "Tell the user what input you expect so they know what to type.",
+        "Store the whole sentence in a text variable.",
+        "If spaces are possible, read a full line instead of a single word.",
+        "Create a counter variable and begin it at zero.",
+        "Visit each character one by one using repetition.",
+        "For each character, check whether it is a vowel.",
+        "If it is a vowel, increase the counter by one.",
+        "After the loop ends, display the final vowel count."
+      ]
+    : [
+        "Start by identifying exactly what the program receives as input.",
+        "Decide which variable(s) will store the input values.",
+        "Initialize any counters or tracking values before processing begins.",
+        "Process the input one item at a time in a loop.",
+        "At each step, apply one clear condition to decide what to do next.",
+        "Update your tracking variables when the condition is satisfied.",
+        "Once processing is complete, print only the final required result.",
+        "Test one normal case and one edge case to confirm behavior."
+      ];
 
   if (count <= base.length) return base.slice(0, count);
   const padded = [...base];
@@ -57,6 +63,20 @@ export function buildSeedFallbackSteps(params: SeedPlanParams): string[] {
     padded.push("Refine your current step by checking boundaries and formatting carefully.");
   }
   return padded;
+}
+
+function normalizeSeedStep(step: string): string {
+  const compact = step.replace(/\s+/g, " ").trim();
+  if (!compact) return "";
+  return compact.replace(/^[\-\d\.\)\s]+/, "").trim();
+}
+
+function enforceSeedStyle(steps: string[], count: number): string[] {
+  const cleaned = steps.map(normalizeSeedStep).filter(Boolean);
+  if (cleaned.length < 5) return [];
+  if (cleaned.length > count) return cleaned.slice(0, count);
+  if (cleaned.length === count) return cleaned;
+  return cleaned;
 }
 
 function stripJsonFence(text: string): string {
@@ -138,6 +158,25 @@ Rules (must follow):
 - ${codeRule}
 - ${specificityGuide}
 - Use supportive, simple language suitable for beginners.
+- Avoid vague generic statements like "restate the problem". Give concrete learning nudges.
+- Prefer a mentor voice similar to: "Think about...", "What should happen when...", "You need...".
+- Do not mention all concepts in one step.
+
+Few-shot example for a vowel-count problem (style reference only, do not copy blindly):
+{"steps":[
+"C++ programs always start from a specific place. Think about where execution begins.",
+"The user needs clear guidance. How will your program ask for the sentence?",
+"You need a place to store text. Which data type can hold a sentence?",
+"A sentence may include spaces. Use an input method that reads a full line.",
+"Start a vowel counter variable from zero.",
+"Check characters one by one by repeating an action over the sentence.",
+"For each character, test whether it matches a vowel.",
+"If it matches, increase the counter.",
+"Print the final counter for the user."
+]}
+
+Bad example (never do this):
+{"steps":["Restate input and output","Write full algorithm","Print answer"]}
 
 Return ONLY valid JSON (no markdown) in this shape:
 {"steps":["...","..."]}`;
@@ -173,5 +212,8 @@ Return ONLY valid JSON (no markdown) in this shape:
     throw new GeminiResponseError("Empty mentor response.");
   }
 
-  return parseStepsPayload(text);
+  const parsed = parseStepsPayload(text);
+  const enforced = enforceSeedStyle(parsed, count);
+  if (enforced.length >= 5) return enforced;
+  return buildSeedFallbackSteps(params).slice(0, count);
 }
