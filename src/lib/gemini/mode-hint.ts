@@ -32,6 +32,9 @@ type ScenarioKey = `${HintMode}_${"code" | "nocode"}_${1 | 2 | 3 | 4 | 5}`;
 
 const SEED_SYSTEM_PROMPT = `You are a foundational programming tutor embedded in an educational coding platform.
 
+ROLE: You teach absolute beginners. You assume ZERO prior programming knowledge.
+LANGUAGE: {LANGUAGE} (C++ or Python — adapt all examples and terminology accordingly).
+
 CORE RULES — NEVER VIOLATE:
 1. Never reveal a full solution or complete code block.
 2. Never skip steps. Always respect the current step number.
@@ -407,18 +410,35 @@ function getScenarioKey(mode: HintMode, hasCode: boolean, depth: 1 | 2 | 3 | 4 |
   return `${mode}_${hasCode ? "code" : "nocode"}_${depth}`;
 }
 
+function clampDepth(value: number | undefined): 1 | 2 | 3 | 4 | 5 {
+  const n = Math.round(Number(value ?? 1));
+  if (!Number.isFinite(n)) return 1;
+  return Math.max(1, Math.min(5, n)) as 1 | 2 | 3 | 4 | 5;
+}
+
+function resolveEffectiveDepth(input: BuildHintInput): 1 | 2 | 3 | 4 | 5 {
+  // SHADOW progression is defined by explicit help clicks, not hint-specificity slider depth.
+  if (input.mode === "SHADOW") {
+    return clampDepth(input.helpClickNumber);
+  }
+  return clampDepth(input.depth);
+}
+
 function interpolate(template: string, input: BuildHintInput): string {
+  const effectiveDepth = resolveEffectiveDepth(input);
   return template
     .replace(/{PROBLEM}/g, input.problem)
     .replace(/{LANGUAGE}/g, input.language === "cpp" ? "C++" : "Python")
     .replace(/{STEP_NUMBER}/g, String(input.step ?? 1))
     .replace(/{TOTAL_STEPS}/g, String(input.totalSteps ?? 9))
+    .replace(/{DEPTH}/g, String(effectiveDepth))
+    .replace(/{HELP_CLICK_NUMBER}/g, String(clampDepth(input.helpClickNumber)))
     .replace(/{USER_CODE}/g, input.userCode ?? "")
     .replace(/{USER_ERROR}/g, input.userError ?? "");
 }
 
 export function buildGeminiPrompt(input: BuildHintInput): { systemInstruction: string; contentText: string } {
-  const key = getScenarioKey(input.mode, input.hasCode, input.depth);
+  const key = getScenarioKey(input.mode, input.hasCode, resolveEffectiveDepth(input));
   const systemInstruction = systemPrompt(input.mode, input.language, Boolean(input.userError?.trim()));
   const fewShotBlock = interpolate(FEW_SHOTS[key], input);
   const liveBlock = interpolate(LIVE_TEMPLATES[key], input);

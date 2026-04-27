@@ -13,6 +13,12 @@ function sanitizeDepth(value: unknown): 1 | 2 | 3 | 4 | 5 {
   return Math.max(1, Math.min(5, Math.round(n))) as 1 | 2 | 3 | 4 | 5;
 }
 
+function sanitizePositiveInt(value: unknown, fallback: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(1, Math.floor(n));
+}
+
 export async function POST(request: Request) {
   const supabase = await createClient();
   const {
@@ -46,11 +52,11 @@ export async function POST(request: Request) {
       problem,
       depth: sanitizeDepth(body.depth),
       hasCode: Boolean(body.hasCode),
-      step: Number(body.step) || 1,
-      totalSteps: Number(body.totalSteps) || 9,
+      step: sanitizePositiveInt(body.step, 1),
+      totalSteps: sanitizePositiveInt(body.totalSteps, 1),
       userCode: (body.userCode ?? "").toString(),
       userError: (body.userError ?? "").toString(),
-      helpClickNumber: Number(body.helpClickNumber) || 1
+      helpClickNumber: sanitizeDepth(body.helpClickNumber)
     });
     return NextResponse.json({ hint });
   } catch (error) {
