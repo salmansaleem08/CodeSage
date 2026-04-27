@@ -67,38 +67,6 @@ int main() {
 `
 };
 
-function getModeHint({
-  mode,
-  problemDescription,
-  seedStep,
-  hintSpecificity
-}: {
-  mode: Mode;
-  problemDescription: string;
-  seedStep: number;
-  hintSpecificity: number;
-}) {
-  const text = problemDescription.trim();
-  if (!text) return "Add a problem statement to receive mode-based guidance.";
-
-  if (mode === "SHADOW") {
-    const nudges = [
-      "Are you checking every character you need to check?",
-      "What exactly defines a match in this problem?",
-      "Is your loop range correct for the problem’s bounds?"
-    ];
-    return nudges[(seedStep - 1) % nudges.length];
-  }
-
-  if (mode === "FOCUS") {
-    if (hintSpecificity <= 2) return "Identify the core transformation between input and desired output.";
-    if (hintSpecificity <= 4) return "Write the algorithm in 3 steps before coding; verify time complexity.";
-    return "Focus on edge cases: empty input, boundaries, and repeated values.";
-  }
-
-  return "";
-}
-
 export function CodeWorkspace() {
   const [language, setLanguage] = useState<Language>("cpp");
   const [code, setCode] = useState<string>(templates.cpp);
@@ -114,7 +82,7 @@ export function CodeWorkspace() {
   const [codeDisclosure, setCodeDisclosure] = useState<CodeDisclosure>("no_code");
   const [hintDelivery, setHintDelivery] = useState<HintDelivery>("on_demand");
   const [hintSpecificity, setHintSpecificity] = useState(3);
-  const [seedStep, setSeedStep] = useState(1);
+  const [shadowHelpClick, setShadowHelpClick] = useState(0);
   const [hintsUsed, setHintsUsed] = useState(0);
   const [currentHint, setCurrentHint] = useState("");
   const [guidanceExpanded, setGuidanceExpanded] = useState(false);
@@ -480,6 +448,37 @@ export function CodeWorkspace() {
     setCode(templates[next]);
   }
 
+  async function requestGeminiHint(forAutomatic = false) {
+    const body = {
+      mode,
+      language,
+      depth: hintSpecificity,
+      problem: [problemTitle, problemDescription, constraints, inputOutputFormat, examples].filter(Boolean).join("\n\n"),
+      hasCode: code.trim().length > 0 && code.trim() !== templates[language].trim(),
+      userCode: code,
+      userError: [execution.error, execution.stderr, execution.compileOutput].filter(Boolean).join("\n"),
+      step: mode === "SEED" ? seedFrontier : 1,
+      totalSteps: mode === "SEED" ? Math.max(seedSteps.length, 9) : 1,
+      helpClickNumber: mode === "SHADOW" ? shadowHelpClick + 1 : 1
+    };
+
+    const response = await fetch("/api/guidance/hint", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    });
+    const data = (await response.json()) as { hint?: string; error?: string };
+    if (!response.ok || !data.hint) {
+      if (!forAutomatic) setCurrentHint(data.error ?? "Could not generate hint.");
+      return;
+    }
+    setCurrentHint(data.hint);
+    setHintsUsed((value) => value + 1);
+    if (mode === "SHADOW") {
+      setShadowHelpClick((v) => Math.min(v + 1, 5));
+    }
+  }
+
   async function execute(type: "run" | "submit") {
     setRunning(true);
     setExecution({
@@ -537,16 +536,7 @@ export function CodeWorkspace() {
       }
 
       if (type === "submit" && hintDelivery === "automatic" && mode !== "SHADOW" && mode !== "SEED" && hasProblemText) {
-        const hint = getModeHint({
-          mode,
-          problemDescription,
-          seedStep,
-          hintSpecificity
-        });
-        if (hint) {
-          setCurrentHint(hint);
-          setHintsUsed((value) => value + 1);
-        }
+        await requestGeminiHint(true);
       }
     } catch {
       setExecution((prev) => ({
@@ -576,15 +566,7 @@ export function CodeWorkspace() {
       return;
     }
 
-    const hint = getModeHint({
-      mode,
-      problemDescription,
-      seedStep,
-      hintSpecificity
-    });
-    setCurrentHint(hint);
-    setHintsUsed((value) => value + 1);
-    if (mode === "SHADOW") setSeedStep((value) => value + 1);
+    void requestGeminiHint(false);
   }
 
   const modeCards: Array<{
@@ -656,7 +638,7 @@ export function CodeWorkspace() {
                 type="button"
                 onClick={() => {
                   setMode(card.id);
-                  setSeedStep(1);
+                  setShadowHelpClick(0);
                   setCurrentHint("");
                 }}
                 className={cn(
