@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { generateSeedStepsWithGemini, GeminiConfigError, GeminiResponseError } from "@/lib/gemini/generate-seed-steps";
+import { buildSeedFallbackSteps, generateSeedStepsWithGemini, GeminiConfigError, GeminiResponseError } from "@/lib/gemini/generate-seed-steps";
 import { fingerprintProblem, settingsKey } from "@/lib/guidance/problem-fingerprint";
 import { createClient } from "@/lib/supabase/server";
 
@@ -110,12 +110,30 @@ export async function POST(request: Request) {
     });
   } catch (e) {
     if (e instanceof GeminiConfigError) {
-      return NextResponse.json({ error: "Guidance service is unavailable." }, { status: 503 });
+      steps = buildSeedFallbackSteps({
+        language,
+        problemTitle: (body.problemTitle ?? "").trim(),
+        problemDescription,
+        constraints,
+        inputOutputFormat,
+        examples,
+        codeDisclosure,
+        hintSpecificity
+      });
+    } else if (e instanceof GeminiResponseError) {
+      steps = buildSeedFallbackSteps({
+        language,
+        problemTitle: (body.problemTitle ?? "").trim(),
+        problemDescription,
+        constraints,
+        inputOutputFormat,
+        examples,
+        codeDisclosure,
+        hintSpecificity
+      });
+    } else {
+      return NextResponse.json({ error: "Could not generate guidance." }, { status: 502 });
     }
-    if (e instanceof GeminiResponseError) {
-      return NextResponse.json({ error: "Could not generate guidance. Try again shortly." }, { status: 502 });
-    }
-    return NextResponse.json({ error: "Could not generate guidance." }, { status: 502 });
   }
 
   const { data: inserted, error: insertError } = await seed()

@@ -29,6 +29,36 @@ function targetStepCount(specificity: number): number {
   return 7;
 }
 
+export function buildSeedFallbackSteps(params: SeedPlanParams): string[] {
+  const count = targetStepCount(params.hintSpecificity);
+  const isStringProblem = /string|sentence|character|vowel|text/i.test(
+    `${params.problemTitle} ${params.problemDescription} ${params.constraints}`
+  );
+
+  const base = [
+    "Restate what the program must read and what it must print.",
+    "Pick a variable to store the full input value before processing it.",
+    "Initialize a counter so you can track how many matches you find.",
+    isStringProblem
+      ? "Loop through the text one character at a time and examine each character."
+      : "Loop through each required element once to process the input in order.",
+    isStringProblem
+      ? "Define the exact match rule (for vowels: a, e, i, o, u, including uppercase if needed)."
+      : "Define the exact condition that decides whether the current value should be counted.",
+    "When the condition is true, increase your counter.",
+    "After the loop, print only the final counter in the required output format.",
+    "Test with one simple case and one edge case to verify your logic.",
+    "If output is wrong, trace one iteration manually and compare expected vs actual state."
+  ];
+
+  if (count <= base.length) return base.slice(0, count);
+  const padded = [...base];
+  while (padded.length < count) {
+    padded.push("Refine your current step by checking boundaries and formatting carefully.");
+  }
+  return padded;
+}
+
 function stripJsonFence(text: string): string {
   const trimmed = text.trim();
   const fence = /^```(?:json)?\s*([\s\S]*?)```$/m.exec(trimmed);

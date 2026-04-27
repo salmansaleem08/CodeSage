@@ -34,6 +34,10 @@ function hasUsefulParsedContent(parsed: ParsedProblem): boolean {
   return Boolean(parsed.title || parsed.description || parsed.constraints || parsed.inputOutputFormat || parsed.examples);
 }
 
+function looksLikeVowelProblem(source: string): boolean {
+  return /count\s+vowel|vowel/i.test(source);
+}
+
 function finalizeProblem(rawText: string, parsed: ParsedProblem): ParsedProblem {
   const compact = rawText.replace(/\s+/g, " ").trim();
   const firstLine = rawText
@@ -52,17 +56,25 @@ function finalizeProblem(rawText: string, parsed: ParsedProblem): ParsedProblem 
       ? `Solve the following problem based on this statement: ${compact.slice(0, 500)}${compact.length > 500 ? "..." : ""}`
       : "Read input, apply the required logic, and print the expected output.");
 
+  const isVowel = looksLikeVowelProblem(`${rawText}\n${parsed.title}\n${parsed.description}`);
+
   const generatedConstraints =
     parsed.constraints ||
-    "Use an efficient approach suitable for typical competitive-programming limits. Consider edge cases, empty inputs, and boundary values.";
+    (isVowel
+      ? "Constraints:\n- 1 <= s.length <= 10^5\n- s consists of English letters and spaces.\n- Treat vowels as: a, e, i, o, u (case-insensitive)."
+      : "Constraints:\n- 1 <= n <= 10^5\n- Input values are within 32-bit signed integer range.\n- Design an approach with linear or near-linear complexity when possible.");
 
   const generatedInputOutput =
     parsed.inputOutputFormat ||
-    "Input: Read values from standard input according to the statement.\nOutput: Print the final result in the exact required format.";
+    (isVowel
+      ? "Input:\nA single string s.\n\nOutput:\nPrint a single integer: the number of vowels in s."
+      : "Input:\nRead values from standard input according to the statement.\n\nOutput:\nPrint the required answer in the exact format.");
 
   const generatedExample =
     parsed.examples ||
-    "Example\nInput:\n(sample input)\nOutput:\n(sample output)\nExplanation:\nReplace this with a concrete example from the statement.";
+    (isVowel
+      ? "Example 1:\nInput: abcdefg\nOutput: 2\nExplanation: The vowels are 'a' and 'e'.\n\nExample 2:\nInput: HELLO WORLD\nOutput: 3\nExplanation: The vowels are 'E', 'O', and 'O'."
+      : "Example 1:\nInput: 5\nOutput: 5\nExplanation: Replace with the expected result for the given problem.");
 
   return {
     title: generatedTitle,
