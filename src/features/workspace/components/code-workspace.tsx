@@ -310,10 +310,7 @@ export function CodeWorkspace() {
 
           setProblemFingerprint(fpLocal);
           setSeedSteps(steps);
-          const max = steps.length;
-          const fs = typeof data.frontierStep === "number" ? data.frontierStep : 1;
-          const isFreshDraft = code.trim() === templates[language].trim();
-          setSeedFrontier(isFreshDraft ? 1 : Math.min(Math.max(fs, 1), max));
+          setSeedFrontier(1);
           setSeedError(null);
           setCurrentHint("");
         } catch {

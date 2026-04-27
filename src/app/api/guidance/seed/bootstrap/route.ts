@@ -88,10 +88,13 @@ export async function POST(request: Request) {
     if (steps.length === 0) {
       return NextResponse.json({ error: "Stored guidance was invalid." }, { status: 500 });
     }
+    if (cached.frontier_step !== 1) {
+      await seed().update({ frontier_step: 1 }).eq("id", cached.id).eq("user_id", user.id);
+    }
     return NextResponse.json({
       sessionId: cached.id,
       steps,
-      frontierStep: Math.min(Math.max(cached.frontier_step, 1), steps.length),
+      frontierStep: 1,
       source: "cache" as const
     });
   }
@@ -162,10 +165,13 @@ export async function POST(request: Request) {
       if (rs.length === 0) {
         return NextResponse.json({ error: "Stored guidance was invalid." }, { status: 500 });
       }
+      if (raced.frontier_step !== 1) {
+        await seed().update({ frontier_step: 1 }).eq("id", raced.id).eq("user_id", user.id);
+      }
       return NextResponse.json({
         sessionId: raced.id,
         steps: rs,
-        frontierStep: Math.min(Math.max(raced.frontier_step, 1), rs.length),
+        frontierStep: 1,
         source: "cache" as const
       });
     }
