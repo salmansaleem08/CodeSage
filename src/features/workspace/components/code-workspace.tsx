@@ -1,12 +1,19 @@
 "use client";
 
 import Editor from "@monaco-editor/react";
+import type { OnMount } from "@monaco-editor/react";
 import { Crosshair, Eye, EyeOff, Leaf, Loader2, MessageSquare, Play, Sparkles, Target, TerminalSquare, Zap } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { fingerprintProblemClient } from "@/lib/guidance/problem-fingerprint-client";
+import { settingsKey as composeSeedSettingsKey } from "@/lib/guidance/problem-fingerprint";
+import { formatSeedHintComment } from "@/features/workspace/lib/seed-hint-format";
+import { registerSeedInlineHintProvider, triggerInlineSuggest } from "@/features/workspace/monaco/register-seed-inline";
+
+const SEED_IDLE_MS = 45_000;
 
 type Language = "cpp" | "python";
 type Mode = "SEED" | "FOCUS" | "SHADOW";
@@ -64,14 +71,7 @@ function getModeHint({
     return "Focus on edge cases: empty input, boundaries, and repeated values.";
   }
 
-  const steps = [
-    "Start by restating what the program should read from input.",
-    "Define variables and data structures needed to store the input.",
-    "Design one loop/condition block that performs the core logic.",
-    "Track intermediate values so you can verify logic at each step.",
-    "Print final output in the exact required format."
-  ];
-  return `Step ${seedStep}: ${steps[(seedStep - 1) % steps.length]}`;
+  return "";
 }
 
 export function CodeWorkspace() {
@@ -102,9 +102,267 @@ export function CodeWorkspace() {
     error: ""
   });
 
+  const [seedSteps, setSeedSteps] = useState<string[]>([]);
+  const [seedFrontier, setSeedFrontier] = useState(1);
+  const [seedLoading, setSeedLoading] = useState(false);
+  const [seedError, setSeedError] = useState<string | null>(null);
+  const [problemFingerprint, setProblemFingerprint] = useState<string | null>(null);
+
+  const editorRef = useRef<import("monaco-editor").editor.IStandaloneCodeEditor | null>(null);
+  const seedInlineDisposeRef = useRef<{ dispose: () => void } | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bootstrapGenRef = useRef(0);
+  const seedStepsRef = useRef<string[]>([]);
+  const modeRef = useRef<Mode>(mode);
+  const hintDeliveryRef = useRef(hintDelivery);
+  const seedBundleRef = useRef({ language, steps: [] as string[], frontier: 1 });
+  const handleSeedAcceptRef = useRef<() => void>(() => {});
+  const armIdleRef = useRef<() => void>(() => {});
+  const fingerprintRef = useRef<string | null>(null);
+
   const hasProblemText = useMemo(
     () => Boolean(problemDescription.trim() || constraints.trim() || inputOutputFormat.trim() || examples.trim()),
     [problemDescription, constraints, inputOutputFormat, examples]
+  );
+
+  useEffect(() => {
+    seedStepsRef.current = seedSteps;
+  }, [seedSteps]);
+
+  useEffect(() => {
+    modeRef.current = mode;
+  }, [mode]);
+
+  useEffect(() => {
+    hintDeliveryRef.current = hintDelivery;
+  }, [hintDelivery]);
+
+  useEffect(() => {
+    fingerprintRef.current = problemFingerprint;
+  }, [problemFingerprint]);
+
+  useEffect(() => {
+    seedBundleRef.current = { language, steps: seedSteps, frontier: seedFrontier };
+  }, [language, seedSteps, seedFrontier]);
+
+  const persistFrontier = useCallback(
+    async (next: number) => {
+      const fp = fingerprintRef.current;
+      if (!fp) return;
+      try {
+        await fetch("/api/guidance/seed/progress", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            problemFingerprint: fp,
+            language,
+            settingsKey: composeSeedSettingsKey(codeDisclosure, hintSpecificity),
+            frontierStep: next
+          })
+        });
+      } catch {
+        // offline / transient — local progression still applies
+      }
+    },
+    [language, codeDisclosure, hintSpecificity]
+  );
+
+  const armIdleTimer = useCallback(() => {
+    if (idleTimerRef.current) {
+      clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = null;
+    }
+    if (modeRef.current !== "SEED" || hintDeliveryRef.current !== "automatic") return;
+    if (!seedStepsRef.current.length) return;
+
+    idleTimerRef.current = setTimeout(() => {
+      idleTimerRef.current = null;
+      if (modeRef.current !== "SEED" || hintDeliveryRef.current !== "automatic") return;
+      const ed = editorRef.current;
+      if (ed) {
+        triggerInlineSuggest(ed);
+        setHintsUsed((h) => h + 1);
+      }
+    }, SEED_IDLE_MS);
+  }, []);
+
+  useEffect(() => {
+    armIdleRef.current = armIdleTimer;
+  }, [armIdleTimer]);
+
+  useEffect(() => {
+    armIdleTimer();
+    return () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+        idleTimerRef.current = null;
+      }
+    };
+  }, [
+    armIdleTimer,
+    code,
+    problemTitle,
+    problemDescription,
+    constraints,
+    inputOutputFormat,
+    examples,
+    hintDelivery,
+    mode,
+    seedSteps.length
+  ]);
+
+  useEffect(() => {
+    if (mode !== "SEED") {
+      setSeedSteps([]);
+      setSeedFrontier(1);
+      setProblemFingerprint(null);
+      setSeedError(null);
+      setSeedLoading(false);
+    }
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "SEED" || !hasProblemText) {
+      if (mode === "SEED" && !hasProblemText) {
+        setSeedLoading(false);
+        setSeedError(null);
+        setSeedSteps([]);
+        setProblemFingerprint(null);
+      }
+      return;
+    }
+
+    const gen = ++bootstrapGenRef.current;
+    setSeedLoading(true);
+    setSeedError(null);
+
+    const debounce = setTimeout(() => {
+      void (async () => {
+        try {
+          const fpLocal = await fingerprintProblemClient({
+            title: problemTitle,
+            description: problemDescription,
+            constraints,
+            inputOutputFormat,
+            examples
+          });
+
+          const res = await fetch("/api/guidance/seed/bootstrap", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              problemTitle,
+              problemDescription,
+              constraints,
+              inputOutputFormat,
+              examples,
+              language,
+              codeDisclosure,
+              hintSpecificity
+            })
+          });
+
+          const data = (await res.json()) as {
+            error?: string;
+            steps?: string[];
+            frontierStep?: number;
+          };
+
+          if (gen !== bootstrapGenRef.current) return;
+
+          if (!res.ok) {
+            setSeedError(data.error ?? "Could not prepare guided steps.");
+            setSeedSteps([]);
+            return;
+          }
+
+          const steps = Array.isArray(data.steps) ? data.steps.filter((s) => typeof s === "string" && s.trim()) : [];
+          if (steps.length === 0) {
+            setSeedError("Guidance could not be loaded.");
+            setSeedSteps([]);
+            return;
+          }
+
+          setProblemFingerprint(fpLocal);
+          setSeedSteps(steps);
+          const max = steps.length;
+          const fs = typeof data.frontierStep === "number" ? data.frontierStep : 1;
+          setSeedFrontier(Math.min(Math.max(fs, 1), max));
+          setSeedError(null);
+          setCurrentHint("");
+        } catch {
+          if (gen === bootstrapGenRef.current) {
+            setSeedError("Could not prepare guided steps.");
+            setSeedSteps([]);
+          }
+        } finally {
+          if (gen === bootstrapGenRef.current) setSeedLoading(false);
+        }
+      })();
+    }, 750);
+
+    return () => clearTimeout(debounce);
+  }, [
+    mode,
+    hasProblemText,
+    problemTitle,
+    problemDescription,
+    constraints,
+    inputOutputFormat,
+    examples,
+    language,
+    codeDisclosure,
+    hintSpecificity
+  ]);
+
+  useEffect(
+    () => () => {
+      seedInlineDisposeRef.current?.dispose();
+      seedInlineDisposeRef.current = null;
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    },
+    []
+  );
+
+  const handleSeedAccept = useCallback(() => {
+    setSeedFrontier((f) => {
+      const max = seedStepsRef.current.length;
+      const next = Math.min(f + 1, max);
+      if (next !== f) {
+        void persistFrontier(next);
+        setHintsUsed((h) => h + 1);
+      }
+      return next;
+    });
+  }, [persistFrontier]);
+
+  useEffect(() => {
+    handleSeedAcceptRef.current = handleSeedAccept;
+  }, [handleSeedAccept]);
+
+  const handleEditorMount: OnMount = useCallback(
+    (editor, monaco) => {
+      editorRef.current = editor;
+      seedInlineDisposeRef.current?.dispose();
+      seedInlineDisposeRef.current = registerSeedInlineHintProvider(
+        monaco,
+        editor,
+        () => {
+          if (modeRef.current !== "SEED") return null;
+          const b = seedBundleRef.current;
+          const idx = b.frontier - 1;
+          const body = b.steps[idx];
+          if (!body) return null;
+          return formatSeedHintComment(b.language, b.frontier, body);
+        },
+        () => handleSeedAcceptRef.current()
+      );
+
+      editor.onDidChangeModelContent(() => {
+        armIdleRef.current();
+      });
+    },
+    []
   );
 
   function switchLanguage(next: Language) {
@@ -150,16 +408,35 @@ export function CodeWorkspace() {
         error: ""
       });
 
-      if (type === "submit" && hintDelivery === "automatic" && mode !== "SHADOW" && hasProblemText) {
+      if (mode === "SEED" && seedStepsRef.current.length > 0 && (type === "run" || type === "submit")) {
+        setSeedFrontier((f) => {
+          const max = seedStepsRef.current.length;
+          const next = Math.min(f + 1, max);
+          if (next !== f) {
+            void persistFrontier(next);
+            setHintsUsed((h) => h + 1);
+          }
+          return next;
+        });
+        if (hintDelivery === "automatic") {
+          queueMicrotask(() => {
+            const ed = editorRef.current;
+            if (ed) triggerInlineSuggest(ed);
+          });
+        }
+      }
+
+      if (type === "submit" && hintDelivery === "automatic" && mode !== "SHADOW" && mode !== "SEED" && hasProblemText) {
         const hint = getModeHint({
           mode,
           problemDescription,
           seedStep,
           hintSpecificity
         });
-        setCurrentHint(hint);
-        setHintsUsed((value) => value + 1);
-        if (mode === "SEED") setSeedStep((value) => value + 1);
+        if (hint) {
+          setCurrentHint(hint);
+          setHintsUsed((value) => value + 1);
+        }
       }
     } catch {
       setExecution((prev) => ({
@@ -172,6 +449,19 @@ export function CodeWorkspace() {
   }
 
   function requestHint() {
+    if (mode === "SEED") {
+      if (!seedSteps.length) {
+        setCurrentHint(
+          seedLoading ? "Getting your guided sequence ready…" : seedError ?? "Add problem details on the left to enable guidance."
+        );
+        return;
+      }
+      const ed = editorRef.current;
+      if (ed) triggerInlineSuggest(ed);
+      setHintsUsed((value) => value + 1);
+      return;
+    }
+
     const hint = getModeHint({
       mode,
       problemDescription,
@@ -180,7 +470,7 @@ export function CodeWorkspace() {
     });
     setCurrentHint(hint);
     setHintsUsed((value) => value + 1);
-    if (mode === "SEED") setSeedStep((value) => value + 1);
+    if (mode === "SHADOW") setSeedStep((value) => value + 1);
   }
 
   const modeCards: Array<{
@@ -313,10 +603,10 @@ export function CodeWorkspace() {
                 onChange={(e) => setHintDelivery(e.target.value as HintDelivery)}
               >
                 <option value="on_demand">On demand (you press Get Hint)</option>
-                <option value="automatic">After Submit (still respects SHADOW)</option>
+                <option value="automatic">Automatic (gentle prompts while you work)</option>
               </select>
               <p className="text-xs text-muted-foreground">
-                On demand keeps you in control. After Submit can provide a timely nudge right after you try—without replacing your thinking. In SHADOW, hints never arrive automatically; use Get Hint.
+                On demand keeps you in control. Automatic surfaces inline guidance after you run or submit, and when you pause—without replacing your thinking. In SHADOW, hints never arrive automatically; use Get Hint.
               </p>
             </div>
             <div className="space-y-2 md:col-span-2">
@@ -348,7 +638,10 @@ export function CodeWorkspace() {
               {mode === "SEED" ? (
                 <>
                   {" "}
-                  • Step focus: <span className="font-medium text-foreground">{seedStep}</span>
+                  • Guided step:{" "}
+                  <span className="font-medium text-foreground">
+                    {seedSteps.length ? `${Math.min(seedFrontier, seedSteps.length)} / ${seedSteps.length}` : "—"}
+                  </span>
                 </>
               ) : null}
             </span>
@@ -415,6 +708,12 @@ export function CodeWorkspace() {
               Python
             </Button>
             <div className="ml-auto flex items-center gap-2">
+              {mode === "SEED" && seedLoading ? (
+                <span className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="size-3.5 animate-spin" />
+                  Preparing steps…
+                </span>
+              ) : null}
               <Button variant="outline" className="h-10" onClick={() => requestHint()}>
                 <Sparkles className="size-4" />
                 Get Hint
@@ -429,18 +728,23 @@ export function CodeWorkspace() {
             </div>
           </div>
 
+          {seedError && mode === "SEED" ? (
+            <p className="mb-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{seedError}</p>
+          ) : null}
           <div className="overflow-hidden rounded-lg border border-border">
             <Editor
               height="min(52vh, 520px)"
               language={language === "cpp" ? "cpp" : "python"}
               value={code}
               onChange={(value) => setCode(value ?? "")}
+              onMount={handleEditorMount}
               theme="vs-dark"
               options={{
                 minimap: { enabled: false },
                 fontSize: 14,
                 tabSize: 2,
-                automaticLayout: true
+                automaticLayout: true,
+                inlineSuggest: { enabled: true }
               }}
             />
           </div>
@@ -477,9 +781,18 @@ export function CodeWorkspace() {
               <pre className="overflow-x-auto whitespace-pre-wrap">{execution.stderr || "No runtime errors."}</pre>
             </div>
           </div>
+          {mode === "SEED" && seedSteps.length > 0 ? (
+            <div className="mt-4 shrink-0 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
+              <p className="font-medium text-foreground">Inline guidance</p>
+              <p className="mt-1">
+                Mentorship appears as subtle text at your cursor—like an assistant suggesting the next thought. Tab inserts it as a comment line
+                so your logic stays yours.
+              </p>
+            </div>
+          ) : null}
           {currentHint ? (
             <div className="mt-4 shrink-0 rounded-md border border-primary/30 bg-primary/10 p-3 text-sm">
-              <p className="mb-1 font-medium text-primary">Current Hint</p>
+              <p className="mb-1 font-medium text-primary">{mode === "SEED" ? "Notice" : "Current Hint"}</p>
               <p>{currentHint}</p>
             </div>
           ) : null}
