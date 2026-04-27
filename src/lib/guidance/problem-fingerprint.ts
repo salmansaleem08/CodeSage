@@ -10,5 +10,5 @@ export function fingerprintProblem(payload: ProblemPayload): string {
 }
 
 export function settingsKey(codeDisclosure: string, hintSpecificity: number): string {
-  return `${codeDisclosure}:${hintSpecificity}`;
+  return `${codeDisclosure}:${hintSpecificity}:seed-v2`;
 }
