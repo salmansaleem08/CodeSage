@@ -146,6 +146,32 @@ export type Database = {
         Update: Record<string, never>;
         Relationships: [];
       };
+      seed_guidance_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          problem_fingerprint: string;
+          language: "cpp" | "python";
+          settings_key: string;
+          steps: Json;
+          frontier_step: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          problem_fingerprint: string;
+          language: "cpp" | "python";
+          settings_key: string;
+          steps: Json;
+          frontier_step?: number;
+        };
+        Update: {
+          steps?: Json;
+          frontier_step?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
