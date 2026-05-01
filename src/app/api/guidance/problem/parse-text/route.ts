@@ -5,6 +5,7 @@ import { parseProblemTextWithGemini } from "@/lib/gemini/parse-problem-text";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type ParseBody = {
   text?: string;

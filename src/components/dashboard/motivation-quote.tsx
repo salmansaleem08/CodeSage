@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useEffect } from "react";
 
 const QUOTES = [
   "Struggle is where thinking begins.",
@@ -15,9 +15,7 @@ const QUOTES = [
   "Progress is proof of deliberate practice."
 ];
 
-function getCurrentQuote(): string {
-  if (typeof window === "undefined") return QUOTES[0];
-
+function getNextQuote(): string {
   const orderKey = "codesage-quote-order";
   const indexKey = "codesage-quote-index";
 
@@ -47,7 +45,14 @@ function getCurrentQuote(): string {
 }
 
 export function MotivationQuote() {
-  const quote = useMemo(() => getCurrentQuote(), []);
+  const [quote, setQuote] = useState<string | null>(null);
+
+  useEffect(() => {
+    setQuote(getNextQuote());
+  }, []);
+
+  // Render nothing until mounted to avoid hydration mismatch
+  if (!quote) return null;
 
   return (
     <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm md:p-8">

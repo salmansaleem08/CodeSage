@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 
 import { GeminiConfigError, GeminiResponseError } from "@/lib/gemini/generate-seed-steps";
-import { generateTestCasesWithGemini } from "@/lib/gemini/generate-test-cases";
+import { generateTestCasesWithGemini, buildFallbackTestCases } from "@/lib/gemini/generate-test-cases";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type Body = {
   language?: string;
@@ -34,28 +35,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Problem description is required." }, { status: 400 });
   }
 
-  const language = body.language === "python" ? "python" : "cpp";
+  const language: "python" | "cpp" = body.language === "python" ? "python" : "cpp";
+
+  const params = {
+    language,
+    problemTitle: (body.problemTitle ?? "").trim(),
+    problemDescription,
+    constraints: (body.constraints ?? "").trim(),
+    inputOutputFormat: (body.inputOutputFormat ?? "").trim(),
+    examples: (body.examples ?? "").trim(),
+  };
 
   try {
-    const testCases = await generateTestCasesWithGemini({
-      language,
-      problemTitle: (body.problemTitle ?? "").trim(),
-      problemDescription,
-      constraints: (body.constraints ?? "").trim(),
-      inputOutputFormat: (body.inputOutputFormat ?? "").trim(),
-      examples: (body.examples ?? "").trim(),
-    });
-    return NextResponse.json({ testCases });
+    const testCases = await generateTestCasesWithGemini(params);
+    return NextResponse.json({ testCases, fallback: false });
   } catch (error) {
-    if (error instanceof GeminiConfigError) {
-      return NextResponse.json({ error: "Test case service unavailable." }, { status: 503 });
+    // On any Gemini failure (timeout, config error, response error, or network error),
+    // use fallback test cases and return 200 so the client never sees a 502/503.
+    if (
+      error instanceof GeminiConfigError ||
+      error instanceof GeminiResponseError ||
+      (error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError"))
+    ) {
+      const testCases = buildFallbackTestCases(params);
+      return NextResponse.json({ testCases, fallback: true });
     }
-    if (error instanceof GeminiResponseError) {
-      return NextResponse.json(
-        { error: "Could not generate test cases. Please try again." },
-        { status: 502 }
-      );
-    }
-    return NextResponse.json({ error: "Could not generate test cases." }, { status: 500 });
+    // Unknown errors also fall back rather than surfacing a 5xx.
+    const testCases = buildFallbackTestCases(params);
+    return NextResponse.json({ testCases, fallback: true });
   }
 }
