@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Medal, Settings2, Star } from "lucide-react";
+import { BarChart3, Lightbulb, Target, Trophy } from "lucide-react";
 
 import { AppHeader } from "@/components/app/app-header";
 import { FriendNetwork } from "@/components/friends/friend-network";
@@ -64,11 +64,6 @@ export default async function SettingsPage() {
   const totalAttempts = attemptsData.length;
   const correctRate = totalAttempts ? Math.round((totalSolved / totalAttempts) * 100) : 0;
   const hints = attemptsData.reduce((sum, entry) => sum + entry.hints_used, 0);
-  const avgHints = totalAttempts ? hints / totalAttempts : 0;
-  const iqLevel = Math.max(80, Math.round(correctRate + totalSolved * 0.8 - avgHints * 4));
-  const mastery =
-    correctRate >= 85 ? "Advanced" : correctRate >= 65 ? "Intermediate" : totalAttempts > 0 ? "Developing" : "Beginner";
-  const stars = Math.max(1, Math.min(5, Number((correctRate / 20 + Math.max(0, 1.5 - avgHints / 2)).toFixed(1))));
 
   const { data: friendships } = await supabase
     .from("friendships")
@@ -138,19 +133,21 @@ export default async function SettingsPage() {
       <section className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 sm:px-6 md:px-10 md:py-8">
         <ProfileSettingsForm userId={user.id} initialProfile={profile} />
 
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Total Problems Solved", value: String(totalSolved), icon: Medal },
-            { label: "IQ Level", value: String(iqLevel), icon: Star },
-            { label: "Coding Mastery", value: mastery, icon: Settings2 },
-            { label: "Stars Rating", value: `${stars} / 5`, icon: Star }
+            { label: "Total Problems Solved", value: String(totalSolved), icon: Trophy },
+            { label: "Accuracy Rate", value: `${correctRate}%`, icon: Target },
+            { label: "Total Hints Used", value: String(hints), icon: Lightbulb },
+            { label: "Total Attempts", value: String(totalAttempts), icon: BarChart3 }
           ].map((metric) => {
             const Icon = metric.icon;
             return (
-              <article key={metric.label} className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <Icon className="mb-3 size-5 text-primary" />
-                <p className="text-xl font-bold">{metric.value}</p>
-                <p className="text-sm text-muted-foreground">{metric.label}</p>
+              <article key={metric.label} className="card-hover rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <div className="mb-4 inline-flex rounded-lg bg-primary/10 p-2">
+                  <Icon className="size-4 text-primary" />
+                </div>
+                <p className="text-3xl font-bold tracking-tight">{metric.value}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{metric.label}</p>
               </article>
             );
           })}

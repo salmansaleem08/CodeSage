@@ -32,44 +32,57 @@ export async function AppHeader() {
   const profile = profileData as HeaderProfile | null;
 
   return (
-    <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur">
-      <div className="mx-auto flex w-full max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6 md:px-10 md:py-4">
-        <div className="flex items-center gap-3 sm:gap-6">
-          <Link href="/dashboard" className="text-sm font-semibold tracking-[0.2em] text-primary uppercase">
+    <header className="sticky top-0 z-10 border-b border-border bg-background/90 backdrop-blur-sm">
+      <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6 md:px-10">
+        {/* Brand + Nav */}
+        <div className="flex items-center gap-4 sm:gap-6">
+          <Link
+            href="/dashboard"
+            className="text-sm font-bold tracking-[0.22em] text-primary uppercase transition-opacity hover:opacity-80"
+          >
             CodeSage
           </Link>
-          <nav className="flex items-center gap-1 text-sm sm:gap-2">
-            <Link href="/dashboard" className="rounded-md px-3 py-2 text-foreground hover:bg-accent">
-              Dashboard
-            </Link>
-            <Link href="/settings" className="rounded-md px-3 py-2 text-foreground hover:bg-accent">
-              Settings
-            </Link>
-            <Link href="/editor" className="rounded-md px-3 py-2 text-foreground hover:bg-accent">
-              Editor
-            </Link>
-            <Link href="/feed" className="rounded-md px-3 py-2 text-foreground hover:bg-accent">
-              Feed
-            </Link>
+          <nav className="flex items-center">
+            {[
+              { href: "/dashboard", label: "Dashboard" },
+              { href: "/editor", label: "Editor" },
+              { href: "/feed", label: "Feed" },
+              { href: "/settings", label: "Settings" }
+            ].map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
         </div>
-        <div className="flex items-center gap-2 sm:gap-4">
+
+        {/* Right side */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
+
           {profile?.avatar_url ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={profile.avatar_url}
               alt="Profile avatar"
-              className="size-9 rounded-full border border-border object-cover"
+              className="size-8 rounded-full border border-border object-cover"
             />
           ) : (
-            <div className="grid size-9 place-content-center rounded-full border border-border bg-background">
-              <UserCircle2 className="size-5 text-muted-foreground" />
+            <div className="grid size-8 place-content-center rounded-full border border-border bg-muted">
+              <UserCircle2 className="size-4 text-muted-foreground" />
             </div>
           )}
-          <p className="hidden text-sm text-muted-foreground lg:block">{user?.email ?? "Learner"}</p>
+
+          <p className="hidden max-w-[160px] truncate text-xs text-muted-foreground lg:block">
+            {user?.email ?? "Learner"}
+          </p>
+
           <form action={signOutAction}>
-            <Button variant="outline" className="h-9">
+            <Button variant="outline" className="h-8 px-3 text-xs">
               Logout
             </Button>
           </form>

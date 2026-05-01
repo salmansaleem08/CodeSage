@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Activity, BarChart3, Brain, Target, TrendingUp } from "lucide-react";
 
@@ -13,6 +14,8 @@ type AttemptRow = {
   created_at: string;
 };
 
+const insightIcons = ["📈", "🔁", "💡", "🏷️", "🚀"];
+
 function ChartCard({
   title,
   subtitle,
@@ -24,25 +27,30 @@ function ChartCard({
 }) {
   const max = Math.max(1, ...values.map((item) => item.value));
   return (
-    <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
-      <div className="mb-4 flex items-center gap-2">
-        <BarChart3 className="size-4 text-primary" />
+    <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+      <div className="mb-5 flex items-center gap-2">
+        <div className="rounded-md bg-primary/10 p-1.5">
+          <BarChart3 className="size-3.5 text-primary" />
+        </div>
         <h3 className="text-sm font-semibold">{title}</h3>
       </div>
-      <div className="mb-3 grid gap-2 rounded-lg border border-border bg-background/70 p-4">
+      <div className="mb-4 space-y-3 rounded-xl border border-border bg-muted/40 p-4">
         {values.map((item) => (
           <div key={item.label}>
-            <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground">
-              <span>{item.label}</span>
-              <span>{item.value}</span>
+            <div className="mb-1.5 flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">{item.label}</span>
+              <span className="font-medium tabular-nums">{item.value}</span>
             </div>
-            <div className="h-2 rounded-full bg-muted">
-              <div className="h-2 rounded-full bg-primary" style={{ width: `${(item.value / max) * 100}%` }} />
+            <div className="h-1.5 overflow-hidden rounded-full bg-border">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-500"
+                style={{ width: `${(item.value / max) * 100}%` }}
+              />
             </div>
           </div>
         ))}
       </div>
-      <p className="text-sm text-muted-foreground">{subtitle}</p>
+      <p className="text-xs text-muted-foreground">{subtitle}</p>
     </article>
   );
 }
@@ -154,33 +162,70 @@ export default async function DashboardPage() {
     { label: "Avg Attempts / Problem", value: avgAttempts.toFixed(1), trend: "lower is better", icon: Brain }
   ];
 
+  // Empty state
+  if (totalSubmissions === 0) {
+    return (
+      <main className="min-h-screen bg-background text-foreground">
+        <AppHeader />
+        <section className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 md:px-10 md:py-8">
+          <MotivationQuote />
+          <div className="mt-8 space-y-2">
+            <p className="text-sm text-muted-foreground">Welcome back</p>
+            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{profileName}</h1>
+          </div>
+          <div className="mt-16 flex flex-col items-center justify-center space-y-4 text-center">
+            <div className="rounded-2xl border border-border bg-card px-10 py-12 shadow-sm">
+              <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary/10">
+                <Target className="size-7 text-primary" />
+              </div>
+              <h2 className="text-xl font-semibold">No submissions yet</h2>
+              <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+                Head to the Editor to start solving problems. Your stats and insights will appear here.
+              </p>
+              <Link
+                href="/editor"
+                className="mt-6 inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+              >
+                Open Editor
+              </Link>
+            </div>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <AppHeader />
       <section className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 sm:px-6 md:px-10 md:py-8">
         <MotivationQuote />
-        <div className="space-y-2">
+        <div className="space-y-1">
           <p className="text-sm text-muted-foreground">Welcome back</p>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{profileName}</h1>
         </div>
 
-        <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        {/* Stat cards */}
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {stats.map((item) => {
             const Icon = item.icon;
             return (
-              <article key={item.label} className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <div className="mb-3 flex items-center justify-between">
-                  <Icon className="size-5 text-primary" />
-                  <p className="text-xs font-medium text-primary">{item.trend}</p>
+              <article key={item.label} className="card-hover rounded-2xl border border-border bg-card p-5 shadow-sm">
+                <div className="mb-4 flex items-start justify-between">
+                  <div className="rounded-lg bg-primary/10 p-2">
+                    <Icon className="size-4 text-primary" />
+                  </div>
+                  <p className="text-[11px] font-medium text-muted-foreground">{item.trend}</p>
                 </div>
-                <p className="text-2xl font-bold">{item.value}</p>
-                <p className="text-sm text-muted-foreground">{item.label}</p>
+                <p className="text-3xl font-bold tracking-tight">{item.value}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{item.label}</p>
               </article>
             );
           })}
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-2">
+        {/* Charts */}
+        <section className="grid gap-4 lg:grid-cols-2">
           <ChartCard
             title="Problem Solving Activity"
             subtitle="Daily solved count over the last 7 days."
@@ -199,13 +244,20 @@ export default async function DashboardPage() {
           />
         </section>
 
-        <section className="grid gap-5 lg:grid-cols-1">
-          <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="mb-4 text-lg font-semibold">Learning Insights</h2>
-            <ul className="space-y-3 text-sm text-muted-foreground">
-              {insights.map((insight) => (
-                <li key={insight} className="rounded-lg border border-border bg-background/60 p-3">
-                  {insight}
+        {/* Learning Insights */}
+        <section>
+          <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+            <h2 className="mb-5 text-base font-semibold">Learning Insights</h2>
+            <ul className="space-y-2.5">
+              {insights.map((insight, idx) => (
+                <li
+                  key={insight}
+                  className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm"
+                >
+                  <span className="mt-px text-base leading-none" aria-hidden="true">
+                    {insightIcons[idx % insightIcons.length]}
+                  </span>
+                  <span className="text-foreground/80">{insight}</span>
                 </li>
               ))}
             </ul>

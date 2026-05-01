@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { UserCircle2 } from "lucide-react";
+import { CheckCircle2, UserCircle2, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +26,8 @@ interface ProfileSettingsFormProps {
 
 type FriendLookup = { id: string };
 
+type StatusKind = "success" | "error" | "";
+
 export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsFormProps) {
   const router = useRouter();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -40,8 +42,14 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
   const [avatarUrl, setAvatarUrl] = useState(initialProfile.avatar_url);
   const [friendEmail, setFriendEmail] = useState("");
   const [status, setStatus] = useState("");
+  const [statusKind, setStatusKind] = useState<StatusKind>("");
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+
+  function showStatus(message: string, kind: StatusKind) {
+    setStatus(message);
+    setStatusKind(kind);
+  }
 
   async function handleAvatarUpload(file: File) {
     setUploading(true);
@@ -50,7 +58,7 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
 
     const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file, { upsert: true });
     if (uploadError) {
-      setStatus(uploadError.message);
+      showStatus(uploadError.message, "error");
       setUploading(false);
       return;
     }
@@ -66,14 +74,14 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
       .eq("id", userId);
 
     if (updateError) {
-      setStatus(updateError.message);
+      showStatus(updateError.message, "error");
       setUploading(false);
       return;
     }
 
     setAvatarUrl(publicUrl);
     setUploading(false);
-    setStatus("Profile photo updated.");
+    showStatus("Profile photo updated.", "success");
     router.refresh();
   }
 
@@ -81,6 +89,7 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
     event.preventDefault();
     setSaving(true);
     setStatus("");
+    setStatusKind("");
 
     const { error } = await supabase
       .from("profiles")
@@ -100,17 +109,18 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
 
     setSaving(false);
     if (error) {
-      setStatus(error.message);
+      showStatus(error.message, "error");
       return;
     }
 
-    setStatus("Profile settings saved.");
+    showStatus("Profile settings saved.", "success");
     router.refresh();
   }
 
   async function handleAddFriend(event: React.FormEvent) {
     event.preventDefault();
     setStatus("");
+    setStatusKind("");
 
     const normalized = friendEmail.trim().toLowerCase();
     if (!normalized) return;
@@ -123,12 +133,12 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
     const friendProfile = friendProfileData as FriendLookup | null;
 
     if (profileError || !friendProfile) {
-      setStatus("Friend account not found.");
+      showStatus("Friend account not found.", "error");
       return;
     }
 
     if (friendProfile.id === userId) {
-      setStatus("You cannot add yourself.");
+      showStatus("You cannot add yourself.", "error");
       return;
     }
 
@@ -139,20 +149,24 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
     });
 
     if (insertError && !insertError.message.includes("duplicate")) {
-      setStatus(insertError.message);
+      showStatus(insertError.message, "error");
       return;
     }
 
     setFriendEmail("");
-    setStatus("Friend request sent.");
+    showStatus("Friend request sent.", "success");
     router.refresh();
   }
 
+  const selectClass =
+    "h-11 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-0 focus-visible:ring-2 focus-visible:ring-ring";
+
   return (
     <div className="space-y-5">
-      <section className="rounded-xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold">Profile Image</h2>
-        <div className="flex items-center gap-4">
+      {/* Avatar section */}
+      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h2 className="mb-4 text-base font-semibold">Profile Image</h2>
+        <div className="flex items-center gap-5">
           <label className="group relative cursor-pointer">
             <input
               type="file"
@@ -171,23 +185,31 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
                 className="size-20 rounded-full border border-border object-cover transition-opacity group-hover:opacity-80"
               />
             ) : (
-              <div className="grid size-20 place-content-center rounded-full border border-border bg-background transition-colors group-hover:bg-accent">
+              <div className="grid size-20 place-content-center rounded-full border border-border bg-muted transition-colors group-hover:bg-accent">
                 <UserCircle2 className="size-9 text-muted-foreground" />
               </div>
             )}
-            <span className="absolute -right-1 -bottom-1 rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold">
+            <span className="absolute -right-1 -bottom-1 rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold shadow-xs">
               Edit
             </span>
           </label>
           <div className="space-y-1">
-            <p className="text-sm font-medium">Click avatar to change photo</p>
-            <p className="text-xs text-muted-foreground">{uploading ? "Uploading..." : "PNG / JPG recommended"}</p>
+            <p className="text-sm font-medium">Click to change photo</p>
+            <p className="text-xs text-muted-foreground">{uploading ? "Uploading…" : "PNG or JPG recommended"}</p>
           </div>
         </div>
       </section>
 
-      <form onSubmit={handleSaveProfile} className="rounded-xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold">Personal Settings</h2>
+      {/* Divider */}
+      <div className="flex items-center gap-3">
+        <div className="h-px flex-1 bg-border" />
+        <span className="text-xs text-muted-foreground">Profile & Preferences</span>
+        <div className="h-px flex-1 bg-border" />
+      </div>
+
+      {/* Personal settings form */}
+      <form onSubmit={handleSaveProfile} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h2 className="mb-5 text-base font-semibold">Personal Settings</h2>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="full-name">Full Name</Label>
@@ -209,7 +231,7 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
             <Label htmlFor="mode">Default Mode</Label>
             <select
               id="mode"
-              className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+              className={selectClass}
               value={defaultMode}
               onChange={(e) => setDefaultMode(e.target.value as "SEED" | "FOCUS" | "SHADOW")}
             >
@@ -240,28 +262,50 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
             />
           </div>
         </div>
-        <Button type="submit" className="mt-5 h-11" disabled={saving}>
-          {saving ? "Saving..." : "Save Settings"}
+        <Button type="submit" className="mt-6 h-11" disabled={saving}>
+          {saving ? "Saving…" : "Save Settings"}
         </Button>
       </form>
 
-      <form onSubmit={handleAddFriend} className="rounded-xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="mb-4 text-lg font-semibold">Quick Friend Request</h2>
-        <div className="flex flex-col gap-3 md:flex-row">
-          <Input
-            type="email"
-            placeholder="Friend email"
-            value={friendEmail}
-            onChange={(event) => setFriendEmail(event.target.value)}
-            className="h-11"
-          />
-          <Button type="submit" className="h-11">
-            Add Friend
+      {/* Quick Friend Request */}
+      <form onSubmit={handleAddFriend} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
+        <h2 className="mb-1.5 text-base font-semibold">Quick Friend Request</h2>
+        <p className="mb-5 text-sm text-muted-foreground">Enter a classmate&apos;s email to send them a friend request.</p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1 space-y-2">
+            <Label htmlFor="friend-email">Friend email</Label>
+            <Input
+              id="friend-email"
+              type="email"
+              placeholder="name@example.com"
+              value={friendEmail}
+              onChange={(event) => setFriendEmail(event.target.value)}
+              className="h-11"
+            />
+          </div>
+          <Button type="submit" className="h-11 sm:w-36">
+            Send Request
           </Button>
         </div>
       </form>
 
-      {status ? <p className="text-sm text-primary">{status}</p> : null}
+      {/* Toast-like status banner */}
+      {status ? (
+        <div
+          className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-sm font-medium ${
+            statusKind === "success"
+              ? "border-green-200 bg-green-50 text-green-800 dark:border-green-800/40 dark:bg-green-950/30 dark:text-green-300"
+              : "border-red-200 bg-red-50 text-red-800 dark:border-red-800/40 dark:bg-red-950/30 dark:text-red-300"
+          }`}
+        >
+          {statusKind === "success" ? (
+            <CheckCircle2 className="size-4 shrink-0" />
+          ) : (
+            <XCircle className="size-4 shrink-0" />
+          )}
+          {status}
+        </div>
+      ) : null}
     </div>
   );
 }

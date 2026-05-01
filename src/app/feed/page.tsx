@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Users } from "lucide-react";
 
 import { AppHeader } from "@/components/app/app-header";
 import { FeedList } from "@/components/feed/feed-list";
@@ -63,12 +65,21 @@ export default async function FeedPage() {
       <main className="min-h-screen bg-background text-foreground">
         <AppHeader />
         <section className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 md:px-10">
-          <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
-            <h1 className="text-2xl font-bold">Friend Feed</h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Add friends from settings to see their wins, streaks, and growth stories here.
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="mb-5 flex size-16 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
+              <Users className="size-7 text-muted-foreground" />
+            </div>
+            <h1 className="text-xl font-semibold">No friends yet</h1>
+            <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+              Add classmates to your network and see their streaks, milestones, and growth stories here.
             </p>
-          </article>
+            <Link
+              href="/settings"
+              className="mt-6 inline-flex h-10 items-center rounded-lg border border-border bg-card px-5 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-accent"
+            >
+              Find Friends in Settings
+            </Link>
+          </div>
         </section>
       </main>
     );
