@@ -15,12 +15,12 @@ export default async function SignupPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background px-4 py-16 text-foreground">
+    <main className="min-h-dvh flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm">
-        <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
-          <div className="mb-6 text-center">
-            <p className="text-sm font-semibold tracking-wide text-foreground">CodeSage</p>
-            <p className="mt-2 text-xs text-muted-foreground">Create your account</p>
+        <div className="w-full max-w-sm rounded-2xl border border-border bg-card p-8 shadow-sm">
+          <div className="mb-7 text-center">
+            <p className="text-xl font-semibold text-foreground mb-1">CodeSage</p>
+            <p className="text-sm text-muted-foreground">Create your account</p>
           </div>
           <AuthForm mode="signup" />
         </div>

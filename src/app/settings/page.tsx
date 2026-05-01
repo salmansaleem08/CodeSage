@@ -148,10 +148,10 @@ export default async function SettingsPage() {
           ].map((metric) => {
             const Icon = metric.icon;
             return (
-              <article key={metric.label} className="rounded-xl border border-border bg-card p-5 shadow-sm">
-                <Icon className="mb-3 size-4 text-muted-foreground/60" />
-                <p className="text-2xl font-bold tracking-tight">{metric.value}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{metric.label}</p>
+              <article key={metric.label} className="rounded-xl border border-border bg-card p-6">
+                <Icon className="mb-3 size-4 text-muted-foreground/50" />
+                <p className="text-3xl font-bold tracking-tight tabular-nums">{metric.value}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{metric.label}</p>
               </article>
             );
           })}

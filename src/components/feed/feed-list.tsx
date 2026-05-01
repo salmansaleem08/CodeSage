@@ -131,9 +131,9 @@ export function FeedList({ items, currentUserId }: { items: FeedItem[]; currentU
   }
 
   return (
-    <div className="space-y-3">
+    <div className="divide-y divide-border">
       {feedItems.map((item) => (
-        <article key={item.id} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+        <article key={item.id} className="py-5">
           {/* Actor row */}
           <div className="flex items-center gap-3">
             {item.actorAvatar ? (
@@ -141,7 +141,7 @@ export function FeedList({ items, currentUserId }: { items: FeedItem[]; currentU
               <img
                 src={item.actorAvatar}
                 alt={item.actorName}
-                className="size-8 rounded-full border border-border object-cover"
+                className="size-8 rounded-full object-cover"
               />
             ) : (
               <div
@@ -152,7 +152,7 @@ export function FeedList({ items, currentUserId }: { items: FeedItem[]; currentU
             )}
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium leading-tight">{item.actorName}</p>
-              <p className="text-xs text-muted-foreground">{timeAgo(item.createdAt)}</p>
+              <p className="text-[11px] text-muted-foreground">{timeAgo(item.createdAt)}</p>
             </div>
           </div>
 
@@ -162,7 +162,7 @@ export function FeedList({ items, currentUserId }: { items: FeedItem[]; currentU
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
           </div>
 
-          {/* Reactions — GitHub-style chips */}
+          {/* Reactions — minimal chips */}
           <div className="mt-3 flex flex-wrap gap-1.5">
             {reactionConfig.map((reaction) => {
               const active = item.viewerReactions.includes(reaction.key);
@@ -171,7 +171,7 @@ export function FeedList({ items, currentUserId }: { items: FeedItem[]; currentU
                   key={reaction.key}
                   onClick={() => toggleReaction(item.id, reaction.key)}
                   disabled={busy[`reaction-${item.id}-${reaction.key}`]}
-                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors disabled:opacity-50 ${
+                  className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors disabled:opacity-50 ${
                     active
                       ? "border-primary/30 bg-primary/8 text-primary"
                       : "border-border bg-background text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"

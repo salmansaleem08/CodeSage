@@ -37,7 +37,7 @@ export async function AppHeader() {
         {/* Brand */}
         <Link
           href="/dashboard"
-          className="text-sm font-semibold text-foreground transition-opacity hover:opacity-70"
+          className="text-base font-semibold text-foreground transition-opacity hover:opacity-70"
         >
           CodeSage
         </Link>
@@ -53,7 +53,7 @@ export async function AppHeader() {
             <Link
               key={link.href}
               href={link.href}
-              className="rounded-md px-3 py-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+              className="rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               {link.label}
             </Link>
@@ -69,10 +69,10 @@ export async function AppHeader() {
             <img
               src={profile.avatar_url}
               alt="Profile avatar"
-              className="size-7 rounded-full border border-border object-cover"
+              className="size-8 rounded-full ring-1 ring-border object-cover"
             />
           ) : (
-            <div className="grid size-7 place-content-center rounded-full border border-border bg-muted">
+            <div className="grid size-8 place-content-center rounded-full ring-1 ring-border bg-muted">
               <UserCircle2 className="size-4 text-muted-foreground" />
             </div>
           )}

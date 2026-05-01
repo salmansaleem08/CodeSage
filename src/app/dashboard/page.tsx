@@ -38,7 +38,7 @@ function ChartCard({
             </div>
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full bg-primary/70 transition-all duration-500"
+                className="h-full rounded-full bg-primary/60 transition-all duration-500"
                 style={{ width: `${(item.value / max) * 100}%` }}
               />
             </div>
@@ -157,7 +157,7 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <section className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 sm:px-6 md:px-10">
+      <section className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 sm:px-6 md:px-10">
         <MotivationQuote />
         <div>
           <p className="text-sm text-muted-foreground">Welcome back</p>
@@ -171,11 +171,11 @@ export default async function DashboardPage() {
             return (
               <article key={item.label} className="rounded-xl border border-border bg-card p-5 shadow-sm">
                 <div className="mb-3 flex items-start justify-between">
-                  <Icon className="size-4 text-muted-foreground/60" />
+                  <Icon className="size-4 text-muted-foreground/50" />
                   <span className="text-[11px] text-muted-foreground">{item.trend}</span>
                 </div>
-                <p className="text-2xl font-bold tracking-tight">{item.value}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">{item.label}</p>
+                <p className="text-3xl font-bold tracking-tight tabular-nums">{item.value}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{item.label}</p>
               </article>
             );
           })}
