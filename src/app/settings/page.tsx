@@ -130,24 +130,28 @@ export default async function SettingsPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <section className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 sm:px-6 md:px-10 md:py-8">
+      <section className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6 md:px-10">
+        <div>
+          <h1 className="text-xl font-semibold">Settings</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Manage your profile, preferences, and connections.</p>
+        </div>
+
         <ProfileSettingsForm userId={user.id} initialProfile={profile} />
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {/* Stats summary */}
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {[
-            { label: "Total Problems Solved", value: String(totalSolved), icon: Trophy },
+            { label: "Problems Solved", value: String(totalSolved), icon: Trophy },
             { label: "Accuracy Rate", value: `${correctRate}%`, icon: Target },
-            { label: "Total Hints Used", value: String(hints), icon: Lightbulb },
+            { label: "Hints Used", value: String(hints), icon: Lightbulb },
             { label: "Total Attempts", value: String(totalAttempts), icon: BarChart3 }
           ].map((metric) => {
             const Icon = metric.icon;
             return (
-              <article key={metric.label} className="card-hover rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="mb-4 inline-flex rounded-lg bg-primary/10 p-2">
-                  <Icon className="size-4 text-primary" />
-                </div>
-                <p className="text-3xl font-bold tracking-tight">{metric.value}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{metric.label}</p>
+              <article key={metric.label} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <Icon className="mb-3 size-4 text-muted-foreground/60" />
+                <p className="text-2xl font-bold tracking-tight">{metric.value}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{metric.label}</p>
               </article>
             );
           })}

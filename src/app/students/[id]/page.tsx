@@ -55,40 +55,40 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
   return (
     <main className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <section className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 sm:px-6 md:px-10 md:py-8">
+      <section className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6 md:px-10">
         {/* Profile card */}
-        <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="flex items-center gap-4">
               {profile.avatar_url ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={profile.avatar_url}
                   alt={profile.full_name}
-                  className="size-20 rounded-full border border-border object-cover"
+                  className="size-16 rounded-full border border-border object-cover"
                 />
               ) : (
-                <div className="grid size-20 place-content-center rounded-full border border-border bg-muted">
-                  <UserCircle2 className="size-10 text-muted-foreground" />
+                <div className="grid size-16 place-content-center rounded-full border border-border bg-muted">
+                  <UserCircle2 className="size-8 text-muted-foreground" />
                 </div>
               )}
               <div>
-                <h1 className="text-2xl font-bold tracking-tight">{profile.full_name || profile.email.split("@")[0]}</h1>
+                <h1 className="text-xl font-semibold">{profile.full_name || profile.email.split("@")[0]}</h1>
                 <p className="text-sm text-muted-foreground">{profile.email}</p>
-                {profile.degree ? <p className="mt-1 text-sm text-muted-foreground">{profile.degree}</p> : null}
+                {profile.degree ? <p className="mt-0.5 text-sm text-muted-foreground">{profile.degree}</p> : null}
               </div>
             </div>
             {user.id !== profile.id ? (
               <StudentRequestButton currentUserId={user.id} targetUserId={profile.id} existingStatus={existingStatus} />
             ) : null}
           </div>
-          {profile.bio ? <p className="mt-5 text-sm leading-relaxed text-muted-foreground">{profile.bio}</p> : null}
+          {profile.bio ? <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{profile.bio}</p> : null}
           {profile.interests?.length ? (
             <div className="mt-4 flex flex-wrap gap-2">
               {profile.interests.map((interest: string) => (
                 <span
                   key={interest}
-                  className="rounded-full border border-border bg-muted/50 px-3 py-1 text-xs font-medium"
+                  className="rounded-full border border-border bg-muted px-3 py-1 text-xs"
                 >
                   {interest}
                 </span>
@@ -99,26 +99,20 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
 
         {/* Stats */}
         <section className="grid gap-4 sm:grid-cols-3">
-          <article className="card-hover rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="mb-4 inline-flex rounded-lg bg-primary/10 p-2">
-              <Medal className="size-4 text-primary" />
-            </div>
-            <p className="text-3xl font-bold tracking-tight">{solved}</p>
-            <p className="mt-1 text-sm text-muted-foreground">Total Solved</p>
+          <article className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <Medal className="mb-3 size-4 text-muted-foreground/60" />
+            <p className="text-2xl font-bold tracking-tight">{solved}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Problems Solved</p>
           </article>
-          <article className="card-hover rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="mb-4 inline-flex rounded-lg bg-primary/10 p-2">
-              <Target className="size-4 text-primary" />
-            </div>
-            <p className="text-3xl font-bold tracking-tight">{accuracy}%</p>
-            <p className="mt-1 text-sm text-muted-foreground">Accuracy Rate</p>
+          <article className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <Target className="mb-3 size-4 text-muted-foreground/60" />
+            <p className="text-2xl font-bold tracking-tight">{accuracy}%</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Accuracy Rate</p>
           </article>
-          <article className="card-hover rounded-2xl border border-border bg-card p-5 shadow-sm">
-            <div className="mb-4 inline-flex rounded-lg bg-primary/10 p-2">
-              <BarChart3 className="size-4 text-primary" />
-            </div>
-            <p className="text-3xl font-bold tracking-tight">{total}</p>
-            <p className="mt-1 text-sm text-muted-foreground">Total Attempts</p>
+          <article className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <BarChart3 className="mb-3 size-4 text-muted-foreground/60" />
+            <p className="text-2xl font-bold tracking-tight">{total}</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Total Attempts</p>
           </article>
         </section>
       </section>

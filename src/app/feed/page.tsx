@@ -64,18 +64,18 @@ export default async function FeedPage() {
     return (
       <main className="min-h-screen bg-background text-foreground">
         <AppHeader />
-        <section className="mx-auto w-full max-w-5xl px-4 py-6 sm:px-6 md:px-10">
-          <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="mb-5 flex size-16 items-center justify-center rounded-2xl border border-border bg-card shadow-sm">
-              <Users className="size-7 text-muted-foreground" />
+        <section className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6 md:px-10">
+          <div className="flex flex-col items-center justify-center py-20 text-center">
+            <div className="mb-5 flex size-14 items-center justify-center rounded-xl border border-border bg-card shadow-sm">
+              <Users className="size-6 text-muted-foreground" />
             </div>
-            <h1 className="text-xl font-semibold">No friends yet</h1>
-            <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-              Add classmates to your network and see their streaks, milestones, and growth stories here.
+            <h1 className="text-lg font-semibold">No connections yet</h1>
+            <p className="mt-2 max-w-xs text-sm text-muted-foreground">
+              Add classmates to your network and see their milestones and growth here.
             </p>
             <Link
               href="/settings"
-              className="mt-6 inline-flex h-10 items-center rounded-lg border border-border bg-card px-5 text-sm font-medium text-foreground shadow-xs transition-colors hover:bg-accent"
+              className="mt-6 inline-flex h-9 items-center rounded-lg border border-border bg-card px-5 text-sm font-medium text-foreground shadow-sm transition-colors hover:bg-accent"
             >
               Find Friends in Settings
             </Link>
@@ -261,13 +261,13 @@ export default async function FeedPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <section className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6 sm:px-6 md:px-10">
-        <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
-          <h1 className="text-2xl font-bold">Friend Success Feed</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Growth updates from your network: streaks, solved milestones, accuracy improvements, and daily consistency.
+      <section className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6 md:px-10">
+        <div>
+          <h1 className="text-xl font-semibold">Activity Feed</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Milestones and progress from your network.
           </p>
-        </article>
+        </div>
         <FeedList items={feedItems} currentUserId={user.id} />
       </section>
     </main>
