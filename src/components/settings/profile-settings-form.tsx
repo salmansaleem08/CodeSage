@@ -164,8 +164,9 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
   return (
     <div className="space-y-5">
       {/* Avatar section */}
-      <section className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="mb-4 text-base font-semibold">Profile Image</h2>
+      <section className="rounded-xl border border-border bg-card p-6">
+        <h2 className="mb-1 text-base font-semibold">Profile Image</h2>
+        <p className="mb-5 text-sm text-muted-foreground">Update your profile photo.</p>
         <div className="flex items-center gap-5">
           <label className="group relative cursor-pointer">
             <input
@@ -208,8 +209,9 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
       </div>
 
       {/* Personal settings form */}
-      <form onSubmit={handleSaveProfile} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="mb-5 text-base font-semibold">Personal Settings</h2>
+      <form onSubmit={handleSaveProfile} className="rounded-xl border border-border bg-card p-6">
+        <h2 className="mb-1 text-base font-semibold">Personal Settings</h2>
+        <p className="mb-5 text-sm text-muted-foreground">Manage your profile and learning preferences.</p>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="full-name">Full Name</Label>
@@ -268,8 +270,8 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
       </form>
 
       {/* Quick Friend Request */}
-      <form onSubmit={handleAddFriend} className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <h2 className="mb-1.5 text-base font-semibold">Quick Friend Request</h2>
+      <form onSubmit={handleAddFriend} className="rounded-xl border border-border bg-card p-6">
+        <h2 className="mb-1 text-base font-semibold">Quick Friend Request</h2>
         <p className="mb-5 text-sm text-muted-foreground">Enter a classmate&apos;s email to send them a friend request.</p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1 space-y-2">

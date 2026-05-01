@@ -54,14 +54,14 @@ export default async function Home() {
       </header>
 
       {/* Hero — centered, clean */}
-      <section className="mx-auto w-full max-w-4xl px-6 pt-20 pb-24 text-center md:px-10 lg:pt-28 lg:pb-32">
+      <section className="mx-auto w-full max-w-4xl px-6 py-32 text-center sm:py-40 md:px-10">
         <div className="space-y-6">
           <div className="space-y-4">
-            <h1 className="text-[2.75rem] leading-[1.12] font-bold tracking-tight md:text-5xl lg:text-[3.5rem]">
+            <h1 className="text-4xl font-bold tracking-tight leading-tight sm:text-5xl">
               Learn to think,{" "}
               <span className="text-primary">not copy.</span>
             </h1>
-            <p className="mx-auto max-w-lg text-lg leading-relaxed text-muted-foreground">
+            <p className="mx-auto max-w-lg text-lg text-muted-foreground mt-4">
               An AI coding mentor that adapts to your level — guiding your reasoning without giving away the answer.
             </p>
           </div>
@@ -82,15 +82,15 @@ export default async function Home() {
       </section>
 
       {/* Feature grid */}
-      <section className="mx-auto grid w-full max-w-5xl gap-5 px-6 pb-28 md:grid-cols-3 md:px-10">
+      <section className="mx-auto grid w-full max-w-5xl gap-6 px-6 pb-28 md:grid-cols-3 md:px-10">
         {features.map((feature) => {
           const Icon = feature.icon;
           return (
             <article
               key={feature.title}
-              className="rounded-xl border border-border bg-card p-6 shadow-sm transition-shadow hover:shadow-md"
+              className="rounded-xl border border-border bg-card p-6"
             >
-              <div className="mb-4 inline-flex rounded-lg border border-border bg-muted p-2.5">
+              <div className="mb-4 inline-flex rounded-lg bg-muted p-2.5">
                 <Icon className="size-4 text-foreground/70" />
               </div>
               <h2 className="text-sm font-semibold">{feature.title}</h2>

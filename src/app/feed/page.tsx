@@ -261,7 +261,7 @@ export default async function FeedPage() {
   return (
     <main className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <section className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6 md:px-10">
+      <section className="mx-auto w-full max-w-2xl space-y-6 px-4 py-8 sm:px-6 md:px-10">
         <div>
           <h1 className="text-xl font-semibold">Activity Feed</h1>
           <p className="mt-1 text-sm text-muted-foreground">

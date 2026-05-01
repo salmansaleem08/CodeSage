@@ -65,7 +65,7 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
                 <img
                   src={profile.avatar_url}
                   alt={profile.full_name}
-                  className="size-16 rounded-full border border-border object-cover"
+                  className="size-16 rounded-full object-cover"
                 />
               ) : (
                 <div className="grid size-16 place-content-center rounded-full border border-border bg-muted">
@@ -73,9 +73,11 @@ export default async function StudentProfilePage({ params }: { params: Promise<{
                 </div>
               )}
               <div>
-                <h1 className="text-xl font-semibold">{profile.full_name || profile.email.split("@")[0]}</h1>
-                <p className="text-sm text-muted-foreground">{profile.email}</p>
-                {profile.degree ? <p className="mt-0.5 text-sm text-muted-foreground">{profile.degree}</p> : null}
+                <h1 className="text-xl font-bold">{profile.full_name || profile.email.split("@")[0]}</h1>
+                <div className="mt-1 flex flex-wrap gap-4">
+                  <span className="text-sm text-muted-foreground">{profile.email}</span>
+                  {profile.degree ? <span className="text-sm text-muted-foreground">{profile.degree}</span> : null}
+                </div>
               </div>
             </div>
             {user.id !== profile.id ? (
