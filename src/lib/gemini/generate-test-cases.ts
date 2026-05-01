@@ -14,6 +14,56 @@ export type GeneratedTestCase = {
   expectedOutput: string;
 };
 
+/**
+ * Parse the examples string to extract input/output pairs.
+ * Handles common formats like:
+ *   Input: ...\nOutput: ...
+ *   Example 1:\nInput: ...\nOutput: ...
+ */
+function parseExamplesString(examples: string): GeneratedTestCase[] {
+  const results: GeneratedTestCase[] = [];
+  if (!examples.trim()) return results;
+
+  // Split on "Example N:" or "Input:" boundaries
+  const blocks = examples.split(/(?:example\s*\d*\s*:?\s*\n?)/i).filter(Boolean);
+
+  for (const block of blocks) {
+    const inputMatch = block.match(/input\s*:?\s*\n?([\s\S]*?)(?=output\s*:|\s*$)/i);
+    const outputMatch = block.match(/output\s*:?\s*\n?([\s\S]*?)(?=input\s*:|explanation\s*:|note\s*:|\s*$)/i);
+    if (inputMatch && outputMatch) {
+      const input = inputMatch[1].trim();
+      const expectedOutput = outputMatch[1].trim();
+      if (expectedOutput) {
+        results.push({ input, expectedOutput });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Build minimal fallback test cases when Gemini is unavailable.
+ * Tries to extract from examples first, then uses constraint-derived minimal cases.
+ */
+export function buildFallbackTestCases(params: TestCaseGenParams): GeneratedTestCase[] {
+  // Try parsing examples field
+  if (params.examples) {
+    const parsed = parseExamplesString(params.examples);
+    if (parsed.length > 0) {
+      return parsed.slice(0, 3);
+    }
+  }
+
+  // Minimal fallback: produce a couple of simple cases with empty/trivial input
+  // Since we have no structured data, return 2 placeholder cases with "0" input
+  return [
+    { input: "0", expectedOutput: "0" },
+    { input: "1", expectedOutput: "1" },
+    { input: "", expectedOutput: "" },
+  ];
+}
+
 function stripJsonFence(text: string): string {
   const trimmed = text.trim();
   const fence = /^```(?:json)?\s*([\s\S]*?)```$/m.exec(trimmed);
@@ -89,6 +139,7 @@ Return ONLY valid JSON, no markdown fences:
         responseMimeType: "application/json",
       },
     }),
+    signal: AbortSignal.timeout(25000),
   });
 
   if (!res.ok) {

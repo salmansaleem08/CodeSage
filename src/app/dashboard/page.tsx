@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Activity, BarChart3, Brain, Target, TrendingUp } from "lucide-react";
 
@@ -131,12 +130,10 @@ export default async function DashboardPage() {
   });
 
   const topics = ["Strings", "Arrays", "Loops", "OOP", "Data Structures", "Recursion", "Other"];
-  const topicDistribution = topics
-    .map((topic) => ({
-      label: topic,
-      value: attemptsData.filter((entry) => entry.topic === topic).length
-    }))
-    .filter((item) => item.value > 0);
+  const topicDistribution = topics.map((topic) => ({
+    label: topic,
+    value: attemptsData.filter((entry) => entry.topic === topic).length
+  }));
 
   const hintUsage = attemptsData.slice(-7).map((entry, index) => ({
     label: `P${index + 1}`,
@@ -162,39 +159,6 @@ export default async function DashboardPage() {
     { label: "Avg Attempts / Problem", value: avgAttempts.toFixed(1), trend: "lower is better", icon: Brain }
   ];
 
-  // Empty state
-  if (totalSubmissions === 0) {
-    return (
-      <main className="min-h-screen bg-background text-foreground">
-        <AppHeader />
-        <section className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 md:px-10 md:py-8">
-          <MotivationQuote />
-          <div className="mt-8 space-y-2">
-            <p className="text-sm text-muted-foreground">Welcome back</p>
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{profileName}</h1>
-          </div>
-          <div className="mt-16 flex flex-col items-center justify-center space-y-4 text-center">
-            <div className="rounded-2xl border border-border bg-card px-10 py-12 shadow-sm">
-              <div className="mx-auto mb-4 flex size-14 items-center justify-center rounded-2xl bg-primary/10">
-                <Target className="size-7 text-primary" />
-              </div>
-              <h2 className="text-xl font-semibold">No submissions yet</h2>
-              <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-                Head to the Editor to start solving problems. Your stats and insights will appear here.
-              </p>
-              <Link
-                href="/editor"
-                className="mt-6 inline-flex h-10 items-center rounded-lg bg-primary px-5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-              >
-                Open Editor
-              </Link>
-            </div>
-          </div>
-        </section>
-      </main>
-    );
-  }
-
   return (
     <main className="min-h-screen bg-background text-foreground">
       <AppHeader />
@@ -205,7 +169,7 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{profileName}</h1>
         </div>
 
-        {/* Stat cards */}
+        {/* Stat cards — always rendered, show 0 when no data */}
         <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {stats.map((item) => {
             const Icon = item.icon;
@@ -224,7 +188,7 @@ export default async function DashboardPage() {
           })}
         </section>
 
-        {/* Charts */}
+        {/* Charts — always rendered even with all-zero data */}
         <section className="grid gap-4 lg:grid-cols-2">
           <ChartCard
             title="Problem Solving Activity"
@@ -235,12 +199,12 @@ export default async function DashboardPage() {
           <ChartCard
             title="Topic Distribution"
             subtitle="Problem attempts by topic."
-            values={topicDistribution.length > 0 ? topicDistribution : [{ label: "No data", value: 0 }]}
+            values={topicDistribution}
           />
           <ChartCard
             title="Hint Usage Behavior"
             subtitle="Hints used in your latest problem attempts."
-            values={hintUsage.length > 0 ? hintUsage : [{ label: "No data", value: 0 }]}
+            values={hintUsage.length > 0 ? hintUsage : topics.map((t) => ({ label: t, value: 0 }))}
           />
         </section>
 

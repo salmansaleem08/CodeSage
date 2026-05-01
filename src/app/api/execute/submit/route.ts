@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const WANDBOX_ENDPOINT = "https://wandbox.org/api/compile.json";
 const MAX_TEST_CASES = 10;
@@ -31,7 +32,14 @@ function getRuntime(language: Language) {
 }
 
 function normalizeOutput(s: string): string {
-  return s.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trimEnd();
+  const lines = s.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+  // Trim each line individually (handles trailing spaces on lines)
+  const trimmedLines = lines.map((line) => line.trim());
+  // Remove trailing empty lines
+  while (trimmedLines.length > 0 && trimmedLines[trimmedLines.length - 1] === "") {
+    trimmedLines.pop();
+  }
+  return trimmedLines.join("\n");
 }
 
 async function runOne(

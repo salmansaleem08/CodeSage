@@ -4,6 +4,7 @@ import { generateHintWithGemini, HintConfigError, HintResponseError, type BuildH
 import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type HintBody = Partial<BuildHintInput>;
 
