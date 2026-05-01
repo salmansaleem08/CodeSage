@@ -46,17 +46,17 @@ function getInitials(name: string): string {
     .join("");
 }
 
-const gradients = [
-  "from-violet-500 to-purple-600",
-  "from-blue-500 to-cyan-600",
-  "from-emerald-500 to-teal-600",
-  "from-orange-500 to-amber-600",
-  "from-pink-500 to-rose-600"
+const avatarColors = [
+  "bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300",
+  "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+  "bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300",
+  "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300"
 ];
 
-function getGradient(name: string): string {
+function getAvatarColor(name: string): string {
   const code = name.charCodeAt(0) + (name.charCodeAt(1) ?? 0);
-  return gradients[code % gradients.length];
+  return avatarColors[code % avatarColors.length];
 }
 
 export function FeedList({ items, currentUserId }: { items: FeedItem[]; currentUserId: string }) {
@@ -131,39 +131,39 @@ export function FeedList({ items, currentUserId }: { items: FeedItem[]; currentU
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {feedItems.map((item) => (
-        <article key={item.id} className="card-hover rounded-2xl border border-border bg-card p-5 shadow-sm md:p-6">
+        <article key={item.id} className="rounded-xl border border-border bg-card p-5 shadow-sm">
           {/* Actor row */}
-          <div className="mb-4 flex items-start gap-3">
+          <div className="flex items-center gap-3">
             {item.actorAvatar ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={item.actorAvatar}
                 alt={item.actorName}
-                className="size-10 rounded-full border border-border object-cover"
+                className="size-8 rounded-full border border-border object-cover"
               />
             ) : (
               <div
-                className={`grid size-10 shrink-0 place-content-center rounded-full bg-gradient-to-br ${getGradient(item.actorName)} text-sm font-bold text-white`}
+                className={`grid size-8 shrink-0 place-content-center rounded-full text-xs font-semibold ${getAvatarColor(item.actorName)}`}
               >
                 {getInitials(item.actorName)}
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold leading-tight">{item.actorName}</p>
-              <p className="text-xs text-muted-foreground">
-                {item.actorEmail} · {timeAgo(item.createdAt)}
-              </p>
+              <p className="text-sm font-medium leading-tight">{item.actorName}</p>
+              <p className="text-xs text-muted-foreground">{timeAgo(item.createdAt)}</p>
             </div>
           </div>
 
           {/* Content */}
-          <h3 className="text-base font-semibold leading-snug">{item.title}</h3>
-          <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+          <div className="mt-3">
+            <p className="text-sm font-medium leading-snug">{item.title}</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.description}</p>
+          </div>
 
-          {/* Reactions */}
-          <div className="mt-4 flex flex-wrap gap-1.5">
+          {/* Reactions — GitHub-style chips */}
+          <div className="mt-3 flex flex-wrap gap-1.5">
             {reactionConfig.map((reaction) => {
               const active = item.viewerReactions.includes(reaction.key);
               return (
@@ -171,51 +171,48 @@ export function FeedList({ items, currentUserId }: { items: FeedItem[]; currentU
                   key={reaction.key}
                   onClick={() => toggleReaction(item.id, reaction.key)}
                   disabled={busy[`reaction-${item.id}-${reaction.key}`]}
-                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                  className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs transition-colors disabled:opacity-50 ${
                     active
-                      ? "border-primary/30 bg-primary/10 text-primary"
-                      : "border-border bg-background text-muted-foreground hover:border-primary/20 hover:bg-primary/5 hover:text-foreground"
+                      ? "border-primary/30 bg-primary/8 text-primary"
+                      : "border-border bg-background text-muted-foreground hover:border-border hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  <span>{reaction.emoji}</span>
-                  <span>{item.reactionCounts[reaction.key]}</span>
+                  <span className="text-[11px]">{reaction.emoji}</span>
+                  <span className="tabular-nums">{item.reactionCounts[reaction.key]}</span>
                 </button>
               );
             })}
           </div>
 
-          {/* Comments */}
-          <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4">
-            <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              <MessageCircle className="size-3.5" />
-              Comments
-            </div>
-            <div className="space-y-2 mb-3">
-              {item.comments.length === 0 ? (
-                <p className="text-xs text-muted-foreground">Be the first to comment.</p>
-              ) : null}
-              {item.comments.map((comment) => (
-                <div key={comment.id} className="rounded-lg border border-border bg-card px-3 py-2.5">
-                  <p className="text-[11px] font-medium text-muted-foreground">
-                    {comment.userName} · {timeAgo(comment.createdAt)}
-                  </p>
-                  <p className="mt-0.5 text-sm leading-snug">{comment.body}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
+          {/* Comments — inline, minimal */}
+          <div className="mt-3 border-t border-border pt-3">
+            {item.comments.length > 0 && (
+              <div className="mb-3 space-y-2.5">
+                {item.comments.map((comment) => (
+                  <div key={comment.id} className="flex gap-2 text-sm">
+                    <span className="shrink-0 font-medium text-foreground/80">{comment.userName}</span>
+                    <span className="text-muted-foreground">{comment.body}</span>
+                    <span className="ml-auto shrink-0 text-xs text-muted-foreground/60">{timeAgo(comment.createdAt)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center gap-2">
+              <MessageCircle className="size-3.5 shrink-0 text-muted-foreground/50" />
               <Input
                 value={commentDrafts[item.id] ?? ""}
                 onChange={(event) => setCommentDrafts((prev) => ({ ...prev, [item.id]: event.target.value }))}
-                placeholder="Write a supportive comment…"
-                className="h-9 text-sm"
+                placeholder={item.comments.length === 0 ? "Add a comment…" : "Reply…"}
+                className="h-8 flex-1 border-0 bg-transparent px-0 text-xs shadow-none focus-visible:ring-0 placeholder:text-muted-foreground/50"
               />
               <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => addComment(item.id)}
-                className="h-9 sm:w-20"
+                className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
                 disabled={busy[`comment-${item.id}`]}
               >
-                Send
+                Post
               </Button>
             </div>
           </div>

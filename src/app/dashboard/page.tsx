@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Activity, BarChart3, Brain, Target, TrendingUp } from "lucide-react";
+import { Activity, Brain, Target, TrendingUp } from "lucide-react";
 
 import { AppHeader } from "@/components/app/app-header";
 import { MotivationQuote } from "@/components/dashboard/motivation-quote";
@@ -13,8 +13,6 @@ type AttemptRow = {
   created_at: string;
 };
 
-const insightIcons = ["📈", "🔁", "💡", "🏷️", "🚀"];
-
 function ChartCard({
   title,
   subtitle,
@@ -26,30 +24,27 @@ function ChartCard({
 }) {
   const max = Math.max(1, ...values.map((item) => item.value));
   return (
-    <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-      <div className="mb-5 flex items-center gap-2">
-        <div className="rounded-md bg-primary/10 p-1.5">
-          <BarChart3 className="size-3.5 text-primary" />
-        </div>
+    <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      <div className="mb-5">
         <h3 className="text-sm font-semibold">{title}</h3>
+        <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
       </div>
-      <div className="mb-4 space-y-3 rounded-xl border border-border bg-muted/40 p-4">
+      <div className="space-y-2.5">
         {values.map((item) => (
           <div key={item.label}>
-            <div className="mb-1.5 flex items-center justify-between text-xs">
+            <div className="mb-1 flex items-center justify-between text-xs">
               <span className="text-muted-foreground">{item.label}</span>
-              <span className="font-medium tabular-nums">{item.value}</span>
+              <span className="font-medium tabular-nums text-foreground">{item.value}</span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-border">
+            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full bg-primary transition-all duration-500"
+                className="h-full rounded-full bg-primary/70 transition-all duration-500"
                 style={{ width: `${(item.value / max) * 100}%` }}
               />
             </div>
           </div>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">{subtitle}</p>
     </article>
   );
 }
@@ -153,75 +148,74 @@ export default async function DashboardPage() {
   }
 
   const stats = [
-    { label: "Total Problems Solved", value: String(totalSolved), trend: `${totalSubmissions} submissions`, icon: Target },
-    { label: "Current Streak", value: `${streak} days`, trend: "consecutive solved days", icon: Activity },
+    { label: "Problems Solved", value: String(totalSolved), trend: `${totalSubmissions} total submissions`, icon: Target },
+    { label: "Current Streak", value: `${streak}d`, trend: "consecutive solved days", icon: Activity },
     { label: "Accuracy Rate", value: `${accuracyRate}%`, trend: "correct / submitted", icon: TrendingUp },
-    { label: "Avg Attempts / Problem", value: avgAttempts.toFixed(1), trend: "lower is better", icon: Brain }
+    { label: "Avg Attempts", value: avgAttempts.toFixed(1), trend: "per problem", icon: Brain }
   ];
 
   return (
     <main className="min-h-screen bg-background text-foreground">
       <AppHeader />
-      <section className="mx-auto w-full max-w-7xl space-y-8 px-4 py-6 sm:px-6 md:px-10 md:py-8">
+      <section className="mx-auto w-full max-w-6xl space-y-8 px-4 py-8 sm:px-6 md:px-10">
         <MotivationQuote />
-        <div className="space-y-1">
+        <div>
           <p className="text-sm text-muted-foreground">Welcome back</p>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{profileName}</h1>
+          <h1 className="mt-0.5 text-2xl font-bold tracking-tight sm:text-3xl">{profileName}</h1>
         </div>
 
         {/* Stat cards — always rendered, show 0 when no data */}
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {stats.map((item) => {
             const Icon = item.icon;
             return (
-              <article key={item.label} className="card-hover rounded-2xl border border-border bg-card p-5 shadow-sm">
-                <div className="mb-4 flex items-start justify-between">
-                  <div className="rounded-lg bg-primary/10 p-2">
-                    <Icon className="size-4 text-primary" />
-                  </div>
-                  <p className="text-[11px] font-medium text-muted-foreground">{item.trend}</p>
+              <article key={item.label} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                <div className="mb-3 flex items-start justify-between">
+                  <Icon className="size-4 text-muted-foreground/60" />
+                  <span className="text-[11px] text-muted-foreground">{item.trend}</span>
                 </div>
-                <p className="text-3xl font-bold tracking-tight">{item.value}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{item.label}</p>
+                <p className="text-2xl font-bold tracking-tight">{item.value}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{item.label}</p>
               </article>
             );
           })}
         </section>
 
         {/* Charts — always rendered even with all-zero data */}
-        <section className="grid gap-4 lg:grid-cols-2">
+        <section className="grid gap-5 lg:grid-cols-2">
           <ChartCard
-            title="Problem Solving Activity"
-            subtitle="Daily solved count over the last 7 days."
+            title="Solving Activity"
+            subtitle="Daily solved count — last 7 days"
             values={dailyProblemCounts}
           />
-          <ChartCard title="Accuracy Trend" subtitle="Daily correctness percentage over the last 7 days." values={accuracyTrend} />
+          <ChartCard
+            title="Accuracy Trend"
+            subtitle="Daily correctness % — last 7 days"
+            values={accuracyTrend}
+          />
           <ChartCard
             title="Topic Distribution"
-            subtitle="Problem attempts by topic."
+            subtitle="Problem attempts by topic"
             values={topicDistribution}
           />
           <ChartCard
-            title="Hint Usage Behavior"
-            subtitle="Hints used in your latest problem attempts."
+            title="Hint Usage"
+            subtitle="Hints used in your latest attempts"
             values={hintUsage.length > 0 ? hintUsage : topics.map((t) => ({ label: t, value: 0 }))}
           />
         </section>
 
         {/* Learning Insights */}
         <section>
-          <article className="rounded-2xl border border-border bg-card p-6 shadow-sm">
-            <h2 className="mb-5 text-base font-semibold">Learning Insights</h2>
-            <ul className="space-y-2.5">
-              {insights.map((insight, idx) => (
+          <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
+            <h2 className="mb-4 text-sm font-semibold">Learning Insights</h2>
+            <ul className="divide-y divide-border">
+              {insights.map((insight) => (
                 <li
                   key={insight}
-                  className="flex items-start gap-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm"
+                  className="py-3 text-sm leading-relaxed text-muted-foreground first:pt-0 last:pb-0"
                 >
-                  <span className="mt-px text-base leading-none" aria-hidden="true">
-                    {insightIcons[idx % insightIcons.length]}
-                  </span>
-                  <span className="text-foreground/80">{insight}</span>
+                  {insight}
                 </li>
               ))}
             </ul>

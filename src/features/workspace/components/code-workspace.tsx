@@ -197,8 +197,6 @@ export function CodeWorkspace() {
     [problemDescription, constraints, inputOutputFormat, examples]
   );
 
-  const currentCard = MODE_CARDS.find((c) => c.id === mode) ?? MODE_CARDS[1];
-
   const depthLabel = useMemo(() => {
     return (["", "Vague nudge", "Concept name", "Explanation", "Pseudocode", "Code snippet"] as const)[
       hintSpecificity
@@ -737,10 +735,10 @@ export function CodeWorkspace() {
     <div className="flex flex-1 flex-col overflow-hidden">
 
       {/* ── Guidance bar ── */}
-      <div className="shrink-0 border-b border-border bg-card px-4 py-2.5">
+      <div className="shrink-0 border-b border-border bg-background/95 px-4 py-2">
         <div className="flex flex-wrap items-center gap-2">
-          {/* Mode toggle */}
-          <div className="inline-flex items-center gap-px rounded-lg border border-border bg-background p-1">
+          {/* Mode toggle — compact pill */}
+          <div className="inline-flex items-center gap-px rounded-full border border-border bg-muted p-0.5">
             {MODE_CARDS.map((card) => {
               const Icon = card.icon;
               const selected = mode === card.id;
@@ -748,15 +746,16 @@ export function CodeWorkspace() {
                 <button
                   key={card.id}
                   type="button"
+                  title={card.longDescription}
                   onClick={() => { setMode(card.id); setShadowHelpClick(0); setCurrentHint(""); }}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                    "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all",
                     selected
-                      ? "bg-primary text-primary-foreground shadow-sm"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                      ? "bg-background text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <Icon className="size-3.5" />
+                  <Icon className="size-3" />
                   {card.id}
                 </button>
               );
@@ -765,7 +764,7 @@ export function CodeWorkspace() {
 
           {/* Status chips */}
           {mode === "SEED" && (
-            <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-muted-foreground">
+            <span className="rounded-full border border-border bg-background px-2.5 py-0.5 text-[11px] text-muted-foreground">
               {seedLoading
                 ? "Preparing…"
                 : seedSteps.length
@@ -774,73 +773,63 @@ export function CodeWorkspace() {
             </span>
           )}
           {mode === "SHADOW" && (
-            <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-muted-foreground">
+            <span className="rounded-full border border-border bg-background px-2.5 py-0.5 text-[11px] text-muted-foreground">
               Nudges: {shadowHelpClick} / 5
             </span>
           )}
-          <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-muted-foreground">
-            {hintsUsed} hint{hintsUsed !== 1 ? "s" : ""} used
+          <span className="rounded-full border border-border bg-background px-2.5 py-0.5 text-[11px] text-muted-foreground">
+            {hintsUsed} hint{hintsUsed !== 1 ? "s" : ""}
           </span>
 
           <button
             type="button"
             onClick={() => setGuidanceExpanded((v) => !v)}
-            className="ml-auto flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            className="ml-auto flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
-            <Settings className="size-3.5" />
+            <Settings className="size-3" />
             Settings
             <ChevronDown className={cn("size-3 transition-transform", guidanceExpanded && "rotate-180")} />
           </button>
         </div>
 
-        {/* Mode description */}
-        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{currentCard.longDescription}</p>
-
-        {/* Settings panel */}
+        {/* Settings panel — slides down */}
         {guidanceExpanded && (
-          <div className="mt-3 grid gap-4 border-t border-border pt-3 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="mt-2 grid gap-4 rounded-lg border border-border bg-card p-3 sm:grid-cols-2 xl:grid-cols-3">
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1.5 text-xs">
-                <Eye className="size-3.5 text-primary" />
+                <Eye className="size-3 text-muted-foreground" />
                 Code in hints
               </Label>
               <select
-                className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs text-foreground"
+                className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs text-foreground"
                 value={codeDisclosure}
                 onChange={(e) => setCodeDisclosure(e.target.value as CodeDisclosure)}
               >
                 <option value="no_code">Text only — no code shown</option>
                 <option value="allow_minimal_code">Allow small code snippets</option>
               </select>
-              <p className="text-[10px] text-muted-foreground">
-                Controls whether hints may include partial {language === "cpp" ? "C++" : "Python"} fragments.
-                Keeping code off makes you work through syntax independently.
-              </p>
             </div>
 
             {mode === "SEED" && (
               <div className="space-y-1.5">
                 <Label className="flex items-center gap-1.5 text-xs">
-                  <MessageSquare className="size-3.5 text-primary" />
+                  <MessageSquare className="size-3 text-muted-foreground" />
                   Hint delivery
                 </Label>
                 <select
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs text-foreground"
+                  className="h-8 w-full rounded-md border border-input bg-background px-2.5 text-xs text-foreground"
                   value={hintDelivery}
                   onChange={(e) => setHintDelivery(e.target.value as HintDelivery)}
                 >
                   <option value="on_demand">On demand — click Show Step</option>
                   <option value="automatic">Automatic — appear while coding</option>
                 </select>
-                <p className="text-[10px] text-muted-foreground">
-                  Automatic shows ghost text after a short typing pause. Press Tab to accept a step and advance.
-                </p>
               </div>
             )}
 
             <div className="space-y-1.5">
               <Label className="flex items-center gap-1.5 text-xs">
-                <Target className="size-3.5 text-primary" />
+                <Target className="size-3 text-muted-foreground" />
                 Hint depth: {hintSpecificity} — {depthLabel}
               </Label>
               <input
@@ -852,9 +841,9 @@ export function CodeWorkspace() {
                 className="w-full accent-primary"
               />
               <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-                <span>1 Conceptual</span>
-                <span>3 Balanced</span>
-                <span>5 Direct code</span>
+                <span>Conceptual</span>
+                <span>Balanced</span>
+                <span>Direct</span>
               </div>
             </div>
           </div>
@@ -864,16 +853,16 @@ export function CodeWorkspace() {
       {/* ── Three-panel workspace ── */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
 
-        {/* ── LEFT: Problem panel ── */}
-        <div className="flex w-[272px] shrink-0 flex-col overflow-hidden border-r border-border">
+        {/* ── LEFT: Problem panel (280px) ── */}
+        <div className="flex w-[280px] shrink-0 flex-col overflow-hidden border-r border-border bg-background">
           <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
             <h2 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Problem
             </h2>
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
-              className="h-7 gap-1 px-2 text-[11px]"
+              className="h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
               onClick={() => fileInputRef.current?.click()}
               disabled={parsingProblemFile}
             >
@@ -882,7 +871,7 @@ export function CodeWorkspace() {
               ) : (
                 <Upload className="size-3" />
               )}
-              Import .txt
+              Import
             </Button>
             <input
               ref={fileInputRef}
@@ -893,16 +882,16 @@ export function CodeWorkspace() {
             />
           </div>
 
-          <div className="flex-1 space-y-3.5 overflow-y-auto p-3">
+          <div className="flex-1 space-y-3 overflow-y-auto p-3">
             {fileParseNotice && (
-              <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-2.5 text-[11px] leading-relaxed text-muted-foreground">
-                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-primary" />
+              <div className="flex items-start gap-2 rounded-md border border-border bg-muted/60 p-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                <CheckCircle2 className="mt-0.5 size-3 shrink-0 text-primary" />
                 <span>{fileParseNotice}</span>
               </div>
             )}
 
             <div className="space-y-1">
-              <Label className="text-[11px]" htmlFor="problem-title">
+              <Label className="text-[11px] text-muted-foreground" htmlFor="problem-title">
                 Title
               </Label>
               <Input
@@ -915,12 +904,12 @@ export function CodeWorkspace() {
             </div>
 
             <div className="space-y-1">
-              <Label className="text-[11px]" htmlFor="problem-description">
+              <Label className="text-[11px] text-muted-foreground" htmlFor="problem-description">
                 Description
               </Label>
               <textarea
                 id="problem-description"
-                className="min-h-[110px] w-full resize-y rounded-md border border-input bg-transparent p-2.5 text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                className="min-h-[100px] w-full resize-y rounded-md border border-input bg-background p-2.5 text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
                 value={problemDescription}
                 onChange={(e) => setProblemDescription(e.target.value)}
                 placeholder="Describe the problem clearly…"
@@ -928,12 +917,12 @@ export function CodeWorkspace() {
             </div>
 
             <div className="space-y-1">
-              <Label className="text-[11px]" htmlFor="problem-constraints">
+              <Label className="text-[11px] text-muted-foreground" htmlFor="problem-constraints">
                 Constraints
               </Label>
               <textarea
                 id="problem-constraints"
-                className="min-h-[56px] w-full resize-y rounded-md border border-input bg-transparent p-2.5 text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                className="min-h-[52px] w-full resize-y rounded-md border border-input bg-background p-2.5 text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
                 value={constraints}
                 onChange={(e) => setConstraints(e.target.value)}
                 placeholder="1 ≤ n ≤ 10⁵…"
@@ -941,12 +930,12 @@ export function CodeWorkspace() {
             </div>
 
             <div className="space-y-1">
-              <Label className="text-[11px]" htmlFor="problem-io">
-                Input / Output format
+              <Label className="text-[11px] text-muted-foreground" htmlFor="problem-io">
+                Input / Output
               </Label>
               <textarea
                 id="problem-io"
-                className="min-h-[56px] w-full resize-y rounded-md border border-input bg-transparent p-2.5 text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                className="min-h-[52px] w-full resize-y rounded-md border border-input bg-background p-2.5 text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
                 value={inputOutputFormat}
                 onChange={(e) => setInputOutputFormat(e.target.value)}
                 placeholder={"Input: …\nOutput: …"}
@@ -954,12 +943,12 @@ export function CodeWorkspace() {
             </div>
 
             <div className="space-y-1">
-              <Label className="text-[11px]" htmlFor="problem-examples">
+              <Label className="text-[11px] text-muted-foreground" htmlFor="problem-examples">
                 Examples
               </Label>
               <textarea
                 id="problem-examples"
-                className="min-h-[90px] w-full resize-y rounded-md border border-input bg-transparent p-2.5 text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                className="min-h-[80px] w-full resize-y rounded-md border border-input bg-background p-2.5 text-xs leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
                 value={examples}
                 onChange={(e) => setExamples(e.target.value)}
                 placeholder={"Input: 5\nOutput: 5\nExplanation: …"}
@@ -969,22 +958,22 @@ export function CodeWorkspace() {
             {/* ── Test Cases ── */}
             <div className="space-y-2 border-t border-border pt-3">
               <div className="flex items-center justify-between">
-                <Label className="flex items-center gap-1.5 text-[11px]">
-                  <FlaskConical className="size-3.5 text-primary" />
+                <span className="flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground">
+                  <FlaskConical className="size-3" />
                   Test Cases
                   {testCases.length > 0 && (
-                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] tabular-nums">
                       {testCases.length}
                     </span>
                   )}
-                </Label>
+                </span>
                 <div className="flex items-center gap-1">
                   {hasProblemText && (
                     <button
                       type="button"
                       onClick={() => void generateTestCases()}
                       disabled={generatingTestCases}
-                      className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
                     >
                       {generatingTestCases ? (
                         <Loader2 className="size-3 animate-spin" />
@@ -997,7 +986,7 @@ export function CodeWorkspace() {
                   <button
                     type="button"
                     onClick={addTestCase}
-                    className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
                     <Plus className="size-3" />
                     Add
@@ -1010,46 +999,46 @@ export function CodeWorkspace() {
               )}
 
               {testCases.length === 0 && !generatingTestCases && (
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[11px] text-muted-foreground/70">
                   {hasProblemText
-                    ? "Click Auto to generate from problem, or Add to create manually."
-                    : "Fill in the problem description to enable auto-generation."}
+                    ? "Auto-generate or add manually."
+                    : "Fill in the problem to enable auto-generation."}
                 </p>
               )}
 
               {testCases.map((tc, i) => (
                 <div
                   key={tc.id}
-                  className="rounded-md border border-border bg-muted/20 p-2 space-y-1.5"
+                  className="space-y-1.5 rounded-md border border-border bg-muted/30 p-2"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-semibold text-muted-foreground">
+                    <span className="text-[10px] font-medium text-muted-foreground">
                       Case {i + 1}
                     </span>
                     <button
                       type="button"
                       onClick={() => removeTestCase(tc.id)}
-                      className="text-muted-foreground transition-colors hover:text-destructive"
+                      className="text-muted-foreground/50 transition-colors hover:text-destructive"
                     >
                       <X className="size-3" />
                     </button>
                   </div>
                   <div>
-                    <span className="text-[10px] text-muted-foreground">Input (stdin)</span>
+                    <span className="text-[10px] text-muted-foreground">Input</span>
                     <textarea
-                      className="mt-0.5 min-h-[32px] w-full resize-y rounded border border-input bg-transparent px-2 py-1 font-mono text-[11px] leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="mt-0.5 min-h-[28px] w-full resize-y rounded border border-input bg-background px-2 py-1 font-mono text-[11px] leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
                       value={tc.input}
                       onChange={(e) => updateTestCase(tc.id, "input", e.target.value)}
                       placeholder="(empty stdin)"
                     />
                   </div>
                   <div>
-                    <span className="text-[10px] text-muted-foreground">Expected output</span>
+                    <span className="text-[10px] text-muted-foreground">Expected</span>
                     <textarea
-                      className="mt-0.5 min-h-[28px] w-full resize-y rounded border border-input bg-transparent px-2 py-1 font-mono text-[11px] leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                      className="mt-0.5 min-h-[24px] w-full resize-y rounded border border-input bg-background px-2 py-1 font-mono text-[11px] leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
                       value={tc.expectedOutput}
                       onChange={(e) => updateTestCase(tc.id, "expectedOutput", e.target.value)}
-                      placeholder="expected stdout…"
+                      placeholder="expected output…"
                     />
                   </div>
                 </div>
@@ -1061,12 +1050,13 @@ export function CodeWorkspace() {
         {/* ── CENTER: Editor panel ── */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {/* Toolbar */}
-          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
-            <div className="inline-flex items-center gap-px rounded-lg border border-border bg-background p-0.5">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-background px-3 py-2">
+            {/* Language toggle — left */}
+            <div className="inline-flex items-center gap-px rounded-md border border-border bg-muted p-0.5">
               <Button
                 variant={language === "cpp" ? "default" : "ghost"}
                 size="sm"
-                className="h-7 px-3 text-xs"
+                className="h-6 px-3 text-[11px]"
                 onClick={() => switchLanguage("cpp")}
               >
                 C++
@@ -1074,47 +1064,49 @@ export function CodeWorkspace() {
               <Button
                 variant={language === "python" ? "default" : "ghost"}
                 size="sm"
-                className="h-7 px-3 text-xs"
+                className="h-6 px-3 text-[11px]"
                 onClick={() => switchLanguage("python")}
               >
                 Python
               </Button>
             </div>
 
+            {/* Status indicators — center */}
             {mode === "SEED" && seedLoading && (
               <span className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Loader2 className="size-3 animate-spin" />
-                Preparing guide…
+                Preparing…
               </span>
             )}
             {mode === "SEED" && waitingForCode && seedSteps.length > 0 && (
-              <span className="flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary">
+              <span className="flex items-center gap-1.5 rounded border border-primary/20 bg-primary/8 px-2 py-0.5 text-[11px] text-primary">
                 <Keyboard className="size-3" />
                 Code step {Math.max(seedFrontier - 1, 1)}, then step {Math.min(seedFrontier, seedSteps.length)} appears
               </span>
             )}
 
+            {/* Action buttons — right */}
             <div className="ml-auto flex items-center gap-1.5">
               <Button
                 variant="outline"
-                className="h-8 gap-1.5 px-3 text-xs"
+                className="h-7 gap-1.5 px-2.5 text-[11px]"
                 onClick={requestHint}
                 disabled={mode === "SEED" && seedLoading}
               >
-                <Sparkles className="size-3.5" />
+                <Sparkles className="size-3" />
                 {mode === "SEED" ? "Show Step" : mode === "SHADOW" ? `Nudge ${shadowHelpClick + 1}` : "Hint"}
               </Button>
               <Button
                 variant="outline"
-                className="h-8 gap-1.5 px-3 text-xs"
+                className="h-7 gap-1.5 px-2.5 text-[11px]"
                 onClick={() => execute("run")}
                 disabled={running}
               >
-                {running ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+                {running ? <Loader2 className="size-3 animate-spin" /> : <Play className="size-3" />}
                 Run
               </Button>
               <Button
-                className="h-8 px-4 text-xs"
+                className="h-7 px-3 text-[11px] font-semibold"
                 onClick={handleSubmit}
                 disabled={running}
               >
@@ -1124,7 +1116,7 @@ export function CodeWorkspace() {
           </div>
 
           {seedError && mode === "SEED" && (
-            <div className="shrink-0 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-xs text-destructive">
+            <div className="shrink-0 border-b border-destructive/20 bg-destructive/8 px-4 py-1.5 text-xs text-destructive">
               {seedError}
             </div>
           )}
@@ -1145,7 +1137,7 @@ export function CodeWorkspace() {
                 automaticLayout: true,
                 inlineSuggest: { enabled: true },
                 scrollBeyondLastLine: false,
-                padding: { top: 12, bottom: 12 },
+                padding: { top: 14, bottom: 14 },
                 fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
                 fontLigatures: true,
                 lineNumbers: "on",
@@ -1155,13 +1147,13 @@ export function CodeWorkspace() {
             />
           </div>
 
-          {/* Stdin */}
-          <div className="shrink-0 border-t border-border px-3 py-2.5">
-            <Label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          {/* Stdin — clean labeled area */}
+          <div className="shrink-0 border-t border-border bg-background px-3 py-2">
+            <Label className="mb-1 block text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60">
               stdin
             </Label>
             <textarea
-              className="h-[64px] w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              className="h-[56px] w-full resize-none rounded-md border border-input bg-muted/40 px-3 py-2 font-mono text-xs focus:bg-background focus:outline-none focus:ring-1 focus:ring-ring"
               value={stdin}
               onChange={(e) => setStdin(e.target.value)}
               placeholder="Standard input for your program…"
@@ -1169,15 +1161,15 @@ export function CodeWorkspace() {
           </div>
         </div>
 
-        {/* ── RIGHT: Console panel ── */}
-        <div className="flex w-[300px] shrink-0 flex-col overflow-hidden border-l border-border">
+        {/* ── RIGHT: Console panel (320px) ── */}
+        <div className="flex w-[320px] shrink-0 flex-col overflow-hidden border-l border-border bg-background">
           {/* Tab header */}
-          <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1.5">
+          <div className="flex shrink-0 items-center gap-1 border-b border-border bg-background px-2 py-1.5">
             <button
               type="button"
               onClick={() => setConsoleTab("console")}
               className={cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
+                "flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-medium transition-colors",
                 consoleTab === "console"
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -1191,7 +1183,7 @@ export function CodeWorkspace() {
               onClick={() => setConsoleTab("results")}
               disabled={!submitSummary}
               className={cn(
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-40",
+                "flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-40",
                 consoleTab === "results"
                   ? "bg-muted text-foreground"
                   : "text-muted-foreground hover:text-foreground"
@@ -1202,9 +1194,9 @@ export function CodeWorkspace() {
               {submitSummary && (
                 <span
                   className={cn(
-                    "rounded-full px-1.5 text-[10px] font-semibold",
+                    "rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
                     submitSummary.passed === submitSummary.total
-                      ? "bg-green-500/15 text-green-500"
+                      ? "bg-green-500/15 text-green-600 dark:text-green-400"
                       : "bg-destructive/15 text-destructive"
                   )}
                 >
@@ -1216,9 +1208,9 @@ export function CodeWorkspace() {
             {consoleTab === "console" && (
               <span
                 className={cn(
-                  "ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium",
+                  "ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium tabular-nums",
                   execution.exitCode === 0 && (execution.stdout || execution.output)
-                    ? "bg-green-500/15 text-green-500"
+                    ? "bg-green-500/15 text-green-600 dark:text-green-400"
                     : execution.exitCode !== 0
                     ? "bg-destructive/15 text-destructive"
                     : "bg-muted text-muted-foreground"
@@ -1233,7 +1225,7 @@ export function CodeWorkspace() {
           {consoleTab === "console" && (
             <div className="flex-1 space-y-3 overflow-y-auto p-3">
               {execution.error && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2.5 text-xs text-destructive">
+                <div className="rounded-md border border-destructive/30 bg-destructive/8 p-2.5 text-xs text-destructive">
                   {execution.error}
                 </div>
               )}
@@ -1249,19 +1241,19 @@ export function CodeWorkspace() {
 
               {/* SEED progress tracker */}
               {mode === "SEED" && seedSteps.length > 0 && (
-                <div className="rounded-md border border-primary/20 bg-primary/5 p-3">
+                <div className="rounded-md border border-border bg-muted/40 p-3">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                      <FileText className="size-3.5" />
+                    <p className="flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                      <FileText className="size-3" />
                       Guided steps
                     </p>
-                    <span className="text-[11px] text-muted-foreground">
-                      {Math.min(seedFrontier - 1, seedSteps.length)} / {seedSteps.length} done
+                    <span className="text-[11px] tabular-nums text-muted-foreground">
+                      {Math.min(seedFrontier - 1, seedSteps.length)} / {seedSteps.length}
                     </span>
                   </div>
-                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div className="h-1 overflow-hidden rounded-full bg-muted">
                     <div
-                      className="h-1.5 rounded-full bg-primary transition-all duration-500"
+                      className="h-1 rounded-full bg-primary transition-all duration-500"
                       style={{
                         width: `${(Math.min(seedFrontier - 1, seedSteps.length) / seedSteps.length) * 100}%`,
                       }}
@@ -1269,9 +1261,9 @@ export function CodeWorkspace() {
                   </div>
                   <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
                     {waitingForCode
-                      ? "✏ Write code for the accepted step — your next step will then appear."
+                      ? "Write code for the accepted step — your next step will then appear."
                       : seedFrontier > seedSteps.length
-                      ? "✓ All steps complete."
+                      ? "All steps complete."
                       : `Step ${Math.min(seedFrontier, seedSteps.length)} ready — look for the ghost text at your cursor.`}
                   </p>
                 </div>
@@ -1279,12 +1271,12 @@ export function CodeWorkspace() {
 
               {/* Current hint */}
               {currentHint && (
-                <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
-                  <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-primary">
-                    <Sparkles className="size-3" />
+                <div className="rounded-md border border-border bg-muted/40 p-3">
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-foreground">
+                    <Sparkles className="size-3 text-primary" />
                     {mode === "SEED" ? "Step Note" : mode === "SHADOW" ? "Nudge" : "Hint"}
                   </p>
-                  <p className="text-sm leading-relaxed text-foreground">{currentHint}</p>
+                  <p className="text-xs leading-relaxed text-muted-foreground">{currentHint}</p>
                 </div>
               )}
             </div>
@@ -1292,7 +1284,7 @@ export function CodeWorkspace() {
 
           {/* Results tab content */}
           {consoleTab === "results" && submitSummary && (
-            <div className="flex-1 space-y-2.5 overflow-y-auto p-3">
+            <div className="flex-1 space-y-2 overflow-y-auto p-3">
               {/* Summary card */}
               <div className="rounded-md border border-border bg-card p-3">
                 <div className="flex items-center justify-between">
@@ -1303,16 +1295,16 @@ export function CodeWorkspace() {
                     className={cn(
                       "text-xs font-medium",
                       submitSummary.passed === submitSummary.total
-                        ? "text-green-500"
+                        ? "text-green-600 dark:text-green-400"
                         : "text-destructive"
                     )}
                   >
                     {submitSummary.passed === submitSummary.total
-                      ? "All tests passed"
+                      ? "All passed"
                       : `${submitSummary.total - submitSummary.passed} failed`}
                   </span>
                 </div>
-                <div className="mt-2 flex h-1.5 gap-0.5 overflow-hidden rounded-full">
+                <div className="mt-2 flex h-1 gap-0.5 overflow-hidden rounded-full">
                   {submitSummary.results.map((r) => (
                     <div
                       key={r.index}
@@ -1332,8 +1324,8 @@ export function CodeWorkspace() {
                   className={cn(
                     "rounded-md border p-2.5 text-xs",
                     r.passed
-                      ? "border-green-500/20 bg-green-500/5"
-                      : "border-destructive/20 bg-destructive/5"
+                      ? "border-green-500/15 bg-green-500/5"
+                      : "border-destructive/15 bg-destructive/5"
                   )}
                 >
                   <div className="mb-1.5 flex items-center gap-2">
@@ -1342,11 +1334,11 @@ export function CodeWorkspace() {
                     ) : (
                       <XCircle className="size-3.5 text-destructive" />
                     )}
-                    <span className="font-semibold">Test {r.index + 1}</span>
+                    <span className="font-medium">Test {r.index + 1}</span>
                     <span
                       className={cn(
                         "ml-auto text-[10px] font-bold tracking-wide",
-                        r.passed ? "text-green-500" : "text-destructive"
+                        r.passed ? "text-green-600 dark:text-green-400" : "text-destructive"
                       )}
                     >
                       {r.passed ? "PASS" : "FAIL"}
@@ -1371,7 +1363,7 @@ export function CodeWorkspace() {
                       {(r.compileError || r.stderr) && (
                         <div>
                           <span className="text-muted-foreground">Error: </span>
-                          <span className="text-destructive/80">{r.compileError || r.stderr}</span>
+                          <span className="text-destructive/70">{r.compileError || r.stderr}</span>
                         </div>
                       )}
                     </div>
@@ -1399,18 +1391,16 @@ function ConsoleBlock({
 }) {
   return (
     <div>
-      <p className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-        <span className="h-px flex-1 bg-border" />
+      <p className="mb-1 text-[10px] font-medium uppercase tracking-widest text-muted-foreground/60">
         {label}
-        <span className="h-px flex-1 bg-border" />
       </p>
       <pre
         className={cn(
-          "rounded-md border border-border bg-black/20 p-2.5 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap break-all text-foreground",
+          "rounded-md border border-border bg-[#0d0d0d] p-2.5 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap break-all text-[#e8e8e8]",
           minHeight
         )}
       >
-        {content || <span className="italic text-muted-foreground">{empty}</span>}
+        {content || <span className="italic text-[#555]">{empty}</span>}
       </pre>
     </div>
   );
