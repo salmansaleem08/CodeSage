@@ -25,3 +25,5 @@ pnpm-debug.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+PROJECT_FULL_TECHNICAL_OVERVIEW.txt
