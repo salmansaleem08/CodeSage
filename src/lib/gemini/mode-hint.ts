@@ -493,25 +493,49 @@ export async function generateHintWithGemini(input: BuildHintInput): Promise<str
   const prompt = buildGeminiPrompt(input);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      systemInstruction: { parts: [{ text: prompt.systemInstruction }] },
-      contents: [{ role: "user", parts: [{ text: prompt.contentText }] }],
-      generationConfig: {
-        temperature: input.mode === "SHADOW" ? 0.05 : input.mode === "FOCUS" ? 0.2 : 0.25,
-        maxOutputTokens: input.mode === "SHADOW" ? 80 : 350,
-      },
-    }),
+  const requestBody = JSON.stringify({
+    systemInstruction: { parts: [{ text: prompt.systemInstruction }] },
+    contents: [{ role: "user", parts: [{ text: prompt.contentText }] }],
+    generationConfig: {
+      temperature: input.mode === "SHADOW" ? 0.05 : input.mode === "FOCUS" ? 0.2 : 0.25,
+      maxOutputTokens: input.mode === "SHADOW" ? 80 : 350,
+    },
   });
 
-  if (!res.ok) throw new HintResponseError(`Hint request failed (${res.status}).`);
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: requestBody,
+        signal: AbortSignal.timeout(22_000),
+      });
 
-  const data = (await res.json()) as {
-    candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
-  };
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-  if (!text) throw new HintResponseError("Empty hint response.");
-  return text;
+      if (!res.ok) {
+        // Retry once on transient server errors
+        if (attempt === 0 && res.status >= 500) {
+          await new Promise((r) => setTimeout(r, 1_200));
+          continue;
+        }
+        throw new HintResponseError(`Hint request failed (${res.status}).`);
+      }
+
+      const data = (await res.json()) as {
+        candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+      };
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+      if (!text) throw new HintResponseError("Empty hint response.");
+      return text;
+    } catch (err) {
+      if (err instanceof HintConfigError || err instanceof HintResponseError) throw err;
+      lastError = err;
+      if (attempt === 0) {
+        await new Promise((r) => setTimeout(r, 1_200));
+      }
+    }
+  }
+  throw new HintResponseError(
+    lastError instanceof Error ? `Hint error: ${lastError.message}` : "Hint generation failed."
+  );
 }

@@ -520,6 +520,17 @@ export function CodeWorkspace() {
 
   // ── Gemini hint request ──
   async function requestGeminiHint(forAutomatic = false) {
+    const problemText = [problemTitle, problemDescription, constraints, inputOutputFormat, examples]
+      .filter(Boolean)
+      .join("\n\n");
+
+    if (!problemText.trim()) {
+      if (!forAutomatic) setCurrentHint("Add a problem description on the left panel first.");
+      return;
+    }
+
+    if (!forAutomatic) setCurrentHint("…");
+
     const clampedSeedStep =
       mode === "SEED"
         ? seedSteps.length > 0
@@ -527,34 +538,43 @@ export function CodeWorkspace() {
           : 1
         : 1;
 
-    const body = {
-      mode,
-      language,
-      depth: hintSpecificity,
-      problem: [problemTitle, problemDescription, constraints, inputOutputFormat, examples]
-        .filter(Boolean)
-        .join("\n\n"),
-      hasCode: code.trim().length > 0 && code.trim() !== templates[language].trim(),
-      userCode: code,
-      userError: [execution.error, execution.stderr, execution.compileOutput].filter(Boolean).join("\n"),
-      step: clampedSeedStep,
-      totalSteps: mode === "SEED" ? Math.max(seedSteps.length, 1) : 1,
-      helpClickNumber: mode === "SHADOW" ? shadowHelpClick + 1 : 1,
-    };
+    try {
+      const response = await fetch("/api/guidance/hint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          language,
+          depth: hintSpecificity,
+          problem: problemText,
+          hasCode: code.trim().length > 0 && code.trim() !== templates[language].trim(),
+          userCode: code,
+          userError: [execution.error, execution.stderr, execution.compileOutput].filter(Boolean).join("\n"),
+          step: clampedSeedStep,
+          totalSteps: mode === "SEED" ? Math.max(seedSteps.length, 1) : 1,
+          helpClickNumber: mode === "SHADOW" ? shadowHelpClick + 1 : 1,
+        }),
+      });
+      const data = (await response.json()) as { hint?: string; error?: string; fallback?: boolean };
 
-    const response = await fetch("/api/guidance/hint", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = (await response.json()) as { hint?: string; error?: string };
-    if (!response.ok || !data.hint) {
-      if (!forAutomatic) setCurrentHint(data.error ?? "Could not generate hint.");
-      return;
+      if (response.status === 401) {
+        if (!forAutomatic) setCurrentHint("Session expired — please refresh the page.");
+        return;
+      }
+      if (response.status === 400) {
+        if (!forAutomatic) setCurrentHint(data.error ?? "Invalid request.");
+        return;
+      }
+      if (!response.ok || !data.hint) {
+        if (!forAutomatic) setCurrentHint("Guidance service is temporarily unavailable.");
+        return;
+      }
+      setCurrentHint(data.hint);
+      setHintsUsed((v) => v + 1);
+      if (mode === "SHADOW") setShadowHelpClick((v) => Math.min(v + 1, 5));
+    } catch {
+      if (!forAutomatic) setCurrentHint("Network error — check your connection and try again.");
     }
-    setCurrentHint(data.hint);
-    setHintsUsed((v) => v + 1);
-    if (mode === "SHADOW") setShadowHelpClick((v) => Math.min(v + 1, 5));
   }
 
   // ── Code execution ──
@@ -718,11 +738,18 @@ export function CodeWorkspace() {
         setCurrentHint("All guided steps complete. Great work!");
         return;
       }
-      // Explicit click overrides the waiting-for-code gate
       setRequiresInput(false);
       const ed = editorRef.current;
       if (ed) triggerInlineSuggest(ed);
       setHintsUsed((v) => v + 1);
+      return;
+    }
+    if (!hasProblemText) {
+      setCurrentHint("Add a problem description on the left panel before requesting a hint.");
+      return;
+    }
+    if (mode === "SHADOW" && shadowHelpClick >= 5) {
+      setCurrentHint("Maximum nudges reached for this session. Try to solve the rest independently.");
       return;
     }
     void requestGeminiHint(false);
