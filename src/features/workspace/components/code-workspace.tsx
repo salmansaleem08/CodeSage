@@ -8,16 +8,20 @@ import {
   Crosshair,
   Eye,
   FileText,
+  FlaskConical,
   Keyboard,
   Leaf,
   Loader2,
   MessageSquare,
   Play,
+  Plus,
   Settings,
   Sparkles,
   Target,
   TerminalSquare,
   Upload,
+  X,
+  XCircle,
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
@@ -48,6 +52,29 @@ type ExecutionState = {
   compileOutput: string;
   exitCode: number;
   error: string;
+};
+
+type TestCase = {
+  id: string;
+  input: string;
+  expectedOutput: string;
+};
+
+type TestCaseResult = {
+  index: number;
+  input: string;
+  expectedOutput: string;
+  actualOutput: string;
+  passed: boolean;
+  exitCode: number;
+  stderr: string;
+  compileError: string;
+};
+
+type SubmitSummary = {
+  total: number;
+  passed: number;
+  results: TestCaseResult[];
 };
 
 type ParsedProblemPayload = {
@@ -139,6 +166,12 @@ export function CodeWorkspace() {
   const [seedError, setSeedError] = useState<string | null>(null);
   const [problemFingerprint, setProblemFingerprint] = useState<string | null>(null);
   const [waitingForCode, setWaitingForCode] = useState(false);
+
+  const [testCases, setTestCases] = useState<TestCase[]>([]);
+  const [generatingTestCases, setGeneratingTestCases] = useState(false);
+  const [testCaseError, setTestCaseError] = useState<string | null>(null);
+  const [submitSummary, setSubmitSummary] = useState<SubmitSummary | null>(null);
+  const [consoleTab, setConsoleTab] = useState<"console" | "results">("console");
 
   const editorRef = useRef<import("monaco-editor").editor.IStandaloneCodeEditor | null>(null);
   const seedInlineDisposeRef = useRef<{ dispose: () => void } | null>(null);
@@ -576,6 +609,102 @@ export function CodeWorkspace() {
     }
   }
 
+  // ── Test cases ──
+  function addTestCase() {
+    setTestCases((prev) => [...prev, { id: crypto.randomUUID(), input: "", expectedOutput: "" }]);
+  }
+
+  function removeTestCase(id: string) {
+    setTestCases((prev) => prev.filter((tc) => tc.id !== id));
+  }
+
+  function updateTestCase(id: string, field: "input" | "expectedOutput", value: string) {
+    setTestCases((prev) => prev.map((tc) => (tc.id === id ? { ...tc, [field]: value } : tc)));
+  }
+
+  async function generateTestCases() {
+    if (!hasProblemText) return;
+    setGeneratingTestCases(true);
+    setTestCaseError(null);
+    try {
+      const res = await fetch("/api/guidance/problem/generate-test-cases", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language,
+          problemTitle,
+          problemDescription,
+          constraints,
+          inputOutputFormat,
+          examples,
+        }),
+      });
+      const data = (await res.json()) as { testCases?: { input: string; expectedOutput: string }[]; error?: string };
+      if (!res.ok) {
+        setTestCaseError(data.error ?? "Could not generate test cases.");
+        return;
+      }
+      if (Array.isArray(data.testCases)) {
+        setTestCases(
+          data.testCases.map((tc) => ({ id: crypto.randomUUID(), input: tc.input, expectedOutput: tc.expectedOutput }))
+        );
+      }
+    } catch {
+      setTestCaseError("Could not generate test cases.");
+    } finally {
+      setGeneratingTestCases(false);
+    }
+  }
+
+  async function recordAttempt(isCorrect: boolean) {
+    const fp = fingerprintRef.current;
+    if (!fp) return;
+    try {
+      await fetch("/api/attempts/record", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ problemFingerprint: fp, problemTitle, problemDescription, isCorrect, hintsUsed }),
+      });
+    } catch {
+      // fire-and-forget
+    }
+  }
+
+  async function handleSubmit() {
+    const validCases = testCases.filter((tc) => tc.expectedOutput.trim() !== "");
+    if (validCases.length === 0) {
+      await execute("submit");
+      return;
+    }
+    setRunning(true);
+    setSubmitSummary(null);
+    try {
+      const res = await fetch("/api/execute/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          language,
+          code,
+          testCases: validCases.map((tc) => ({ input: tc.input, expectedOutput: tc.expectedOutput })),
+        }),
+      });
+      const data = (await res.json()) as SubmitSummary & { error?: string };
+      if (!res.ok) {
+        setExecution((prev) => ({ ...prev, error: data.error ?? "Submit failed." }));
+        setConsoleTab("console");
+        return;
+      }
+      setSubmitSummary(data);
+      setConsoleTab("results");
+      void recordAttempt(data.passed === data.total);
+    } catch {
+      setExecution((prev) => ({ ...prev, error: "Unexpected error during submit." }));
+      setConsoleTab("console");
+    } finally {
+      setRunning(false);
+    }
+  }
+
   // ── Hint button ──
   function requestHint() {
     if (mode === "SEED") {
@@ -836,6 +965,96 @@ export function CodeWorkspace() {
                 placeholder={"Input: 5\nOutput: 5\nExplanation: …"}
               />
             </div>
+
+            {/* ── Test Cases ── */}
+            <div className="space-y-2 border-t border-border pt-3">
+              <div className="flex items-center justify-between">
+                <Label className="flex items-center gap-1.5 text-[11px]">
+                  <FlaskConical className="size-3.5 text-primary" />
+                  Test Cases
+                  {testCases.length > 0 && (
+                    <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] text-primary">
+                      {testCases.length}
+                    </span>
+                  )}
+                </Label>
+                <div className="flex items-center gap-1">
+                  {hasProblemText && (
+                    <button
+                      type="button"
+                      onClick={() => void generateTestCases()}
+                      disabled={generatingTestCases}
+                      className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
+                    >
+                      {generatingTestCases ? (
+                        <Loader2 className="size-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="size-3" />
+                      )}
+                      Auto
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={addTestCase}
+                    className="flex items-center gap-1 rounded-md px-2 py-1 text-[10px] text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  >
+                    <Plus className="size-3" />
+                    Add
+                  </button>
+                </div>
+              </div>
+
+              {testCaseError && (
+                <p className="text-[11px] text-destructive">{testCaseError}</p>
+              )}
+
+              {testCases.length === 0 && !generatingTestCases && (
+                <p className="text-[11px] text-muted-foreground">
+                  {hasProblemText
+                    ? "Click Auto to generate from problem, or Add to create manually."
+                    : "Fill in the problem description to enable auto-generation."}
+                </p>
+              )}
+
+              {testCases.map((tc, i) => (
+                <div
+                  key={tc.id}
+                  className="rounded-md border border-border bg-muted/20 p-2 space-y-1.5"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-semibold text-muted-foreground">
+                      Case {i + 1}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeTestCase(tc.id)}
+                      className="text-muted-foreground transition-colors hover:text-destructive"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground">Input (stdin)</span>
+                    <textarea
+                      className="mt-0.5 min-h-[32px] w-full resize-y rounded border border-input bg-transparent px-2 py-1 font-mono text-[11px] leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                      value={tc.input}
+                      onChange={(e) => updateTestCase(tc.id, "input", e.target.value)}
+                      placeholder="(empty stdin)"
+                    />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-muted-foreground">Expected output</span>
+                    <textarea
+                      className="mt-0.5 min-h-[28px] w-full resize-y rounded border border-input bg-transparent px-2 py-1 font-mono text-[11px] leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                      value={tc.expectedOutput}
+                      onChange={(e) => updateTestCase(tc.id, "expectedOutput", e.target.value)}
+                      placeholder="expected stdout…"
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -896,7 +1115,7 @@ export function CodeWorkspace() {
               </Button>
               <Button
                 className="h-8 px-4 text-xs"
-                onClick={() => execute("submit")}
+                onClick={handleSubmit}
                 disabled={running}
               >
                 {running ? "Running…" : "Submit"}
@@ -952,82 +1171,215 @@ export function CodeWorkspace() {
 
         {/* ── RIGHT: Console panel ── */}
         <div className="flex w-[300px] shrink-0 flex-col overflow-hidden border-l border-border">
-          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-            <TerminalSquare className="size-3.5 text-primary" />
-            <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
-              Console
-            </h3>
-            <span
+          {/* Tab header */}
+          <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1.5">
+            <button
+              type="button"
+              onClick={() => setConsoleTab("console")}
               className={cn(
-                "ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium",
-                execution.exitCode === 0 && (execution.stdout || execution.output)
-                  ? "bg-green-500/15 text-green-500"
-                  : execution.exitCode !== 0
-                  ? "bg-destructive/15 text-destructive"
-                  : "bg-muted text-muted-foreground"
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors",
+                consoleTab === "console"
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
-              Exit {execution.exitCode}
-            </span>
+              <TerminalSquare className="size-3" />
+              Console
+            </button>
+            <button
+              type="button"
+              onClick={() => setConsoleTab("results")}
+              disabled={!submitSummary}
+              className={cn(
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[11px] font-medium transition-colors disabled:opacity-40",
+                consoleTab === "results"
+                  ? "bg-muted text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <FlaskConical className="size-3" />
+              Results
+              {submitSummary && (
+                <span
+                  className={cn(
+                    "rounded-full px-1.5 text-[10px] font-semibold",
+                    submitSummary.passed === submitSummary.total
+                      ? "bg-green-500/15 text-green-500"
+                      : "bg-destructive/15 text-destructive"
+                  )}
+                >
+                  {submitSummary.passed}/{submitSummary.total}
+                </span>
+              )}
+            </button>
+
+            {consoleTab === "console" && (
+              <span
+                className={cn(
+                  "ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium",
+                  execution.exitCode === 0 && (execution.stdout || execution.output)
+                    ? "bg-green-500/15 text-green-500"
+                    : execution.exitCode !== 0
+                    ? "bg-destructive/15 text-destructive"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                Exit {execution.exitCode}
+              </span>
+            )}
           </div>
 
-          <div className="flex-1 space-y-3 overflow-y-auto p-3">
-            {execution.error && (
-              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2.5 text-xs text-destructive">
-                {execution.error}
-              </div>
-            )}
+          {/* Console tab content */}
+          {consoleTab === "console" && (
+            <div className="flex-1 space-y-3 overflow-y-auto p-3">
+              {execution.error && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2.5 text-xs text-destructive">
+                  {execution.error}
+                </div>
+              )}
 
-            <ConsoleBlock label="Compile" content={execution.compileOutput} empty="No compile output" />
-            <ConsoleBlock
-              label="Output"
-              content={execution.stdout || execution.output}
-              empty="No output yet"
-              minHeight="min-h-[64px]"
-            />
-            <ConsoleBlock label="Errors" content={execution.stderr} empty="No runtime errors" />
+              <ConsoleBlock label="Compile" content={execution.compileOutput} empty="No compile output" />
+              <ConsoleBlock
+                label="Output"
+                content={execution.stdout || execution.output}
+                empty="No output yet"
+                minHeight="min-h-[64px]"
+              />
+              <ConsoleBlock label="Errors" content={execution.stderr} empty="No runtime errors" />
 
-            {/* SEED progress tracker */}
-            {mode === "SEED" && seedSteps.length > 0 && (
-              <div className="rounded-md border border-primary/20 bg-primary/5 p-3">
-                <div className="mb-2 flex items-center justify-between gap-2">
-                  <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
-                    <FileText className="size-3.5" />
-                    Guided steps
+              {/* SEED progress tracker */}
+              {mode === "SEED" && seedSteps.length > 0 && (
+                <div className="rounded-md border border-primary/20 bg-primary/5 p-3">
+                  <div className="mb-2 flex items-center justify-between gap-2">
+                    <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                      <FileText className="size-3.5" />
+                      Guided steps
+                    </p>
+                    <span className="text-[11px] text-muted-foreground">
+                      {Math.min(seedFrontier - 1, seedSteps.length)} / {seedSteps.length} done
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-1.5 rounded-full bg-primary transition-all duration-500"
+                      style={{
+                        width: `${(Math.min(seedFrontier - 1, seedSteps.length) / seedSteps.length) * 100}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                    {waitingForCode
+                      ? "✏ Write code for the accepted step — your next step will then appear."
+                      : seedFrontier > seedSteps.length
+                      ? "✓ All steps complete."
+                      : `Step ${Math.min(seedFrontier, seedSteps.length)} ready — look for the ghost text at your cursor.`}
                   </p>
-                  <span className="text-[11px] text-muted-foreground">
-                    {Math.min(seedFrontier - 1, seedSteps.length)} / {seedSteps.length} done
+                </div>
+              )}
+
+              {/* Current hint */}
+              {currentHint && (
+                <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
+                  <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-primary">
+                    <Sparkles className="size-3" />
+                    {mode === "SEED" ? "Step Note" : mode === "SHADOW" ? "Nudge" : "Hint"}
+                  </p>
+                  <p className="text-sm leading-relaxed text-foreground">{currentHint}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Results tab content */}
+          {consoleTab === "results" && submitSummary && (
+            <div className="flex-1 space-y-2.5 overflow-y-auto p-3">
+              {/* Summary card */}
+              <div className="rounded-md border border-border bg-card p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">
+                    {submitSummary.passed} / {submitSummary.total} passed
+                  </span>
+                  <span
+                    className={cn(
+                      "text-xs font-medium",
+                      submitSummary.passed === submitSummary.total
+                        ? "text-green-500"
+                        : "text-destructive"
+                    )}
+                  >
+                    {submitSummary.passed === submitSummary.total
+                      ? "All tests passed"
+                      : `${submitSummary.total - submitSummary.passed} failed`}
                   </span>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-                  <div
-                    className="h-1.5 rounded-full bg-primary transition-all duration-500"
-                    style={{
-                      width: `${(Math.min(seedFrontier - 1, seedSteps.length) / seedSteps.length) * 100}%`,
-                    }}
-                  />
+                <div className="mt-2 flex h-1.5 gap-0.5 overflow-hidden rounded-full">
+                  {submitSummary.results.map((r) => (
+                    <div
+                      key={r.index}
+                      className={cn(
+                        "flex-1 rounded-full",
+                        r.passed ? "bg-green-500" : "bg-destructive"
+                      )}
+                    />
+                  ))}
                 </div>
-                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
-                  {waitingForCode
-                    ? "✏ Write code for the accepted step — your next step will then appear."
-                    : seedFrontier > seedSteps.length
-                    ? "✓ All steps complete."
-                    : `Step ${Math.min(seedFrontier, seedSteps.length)} ready — look for the ghost text at your cursor.`}
-                </p>
               </div>
-            )}
 
-            {/* Current hint */}
-            {currentHint && (
-              <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
-                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-primary">
-                  <Sparkles className="size-3" />
-                  {mode === "SEED" ? "Step Note" : mode === "SHADOW" ? "Nudge" : "Hint"}
-                </p>
-                <p className="text-sm leading-relaxed text-foreground">{currentHint}</p>
-              </div>
-            )}
-          </div>
+              {/* Per-test results */}
+              {submitSummary.results.map((r) => (
+                <div
+                  key={r.index}
+                  className={cn(
+                    "rounded-md border p-2.5 text-xs",
+                    r.passed
+                      ? "border-green-500/20 bg-green-500/5"
+                      : "border-destructive/20 bg-destructive/5"
+                  )}
+                >
+                  <div className="mb-1.5 flex items-center gap-2">
+                    {r.passed ? (
+                      <CheckCircle2 className="size-3.5 text-green-500" />
+                    ) : (
+                      <XCircle className="size-3.5 text-destructive" />
+                    )}
+                    <span className="font-semibold">Test {r.index + 1}</span>
+                    <span
+                      className={cn(
+                        "ml-auto text-[10px] font-bold tracking-wide",
+                        r.passed ? "text-green-500" : "text-destructive"
+                      )}
+                    >
+                      {r.passed ? "PASS" : "FAIL"}
+                    </span>
+                  </div>
+                  {!r.passed && (
+                    <div className="space-y-1 font-mono text-[11px]">
+                      {r.input && (
+                        <div>
+                          <span className="text-muted-foreground">Input: </span>
+                          <span className="break-all">{r.input}</span>
+                        </div>
+                      )}
+                      <div>
+                        <span className="text-muted-foreground">Expected: </span>
+                        <span className="text-green-600 dark:text-green-400">{r.expectedOutput || "(empty)"}</span>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Got: </span>
+                        <span className="text-destructive">{r.actualOutput || "(empty)"}</span>
+                      </div>
+                      {(r.compileError || r.stderr) && (
+                        <div>
+                          <span className="text-muted-foreground">Error: </span>
+                          <span className="text-destructive/80">{r.compileError || r.stderr}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
