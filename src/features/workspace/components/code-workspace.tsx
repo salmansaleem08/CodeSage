@@ -3,19 +3,22 @@
 import Editor from "@monaco-editor/react";
 import type { OnMount } from "@monaco-editor/react";
 import {
+  CheckCircle2,
   ChevronDown,
   Crosshair,
   Eye,
   FileText,
+  Keyboard,
   Leaf,
   Loader2,
   MessageSquare,
   Play,
+  Settings,
   Sparkles,
   Target,
   TerminalSquare,
   Upload,
-  Zap
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
@@ -31,6 +34,7 @@ import { registerSeedInlineHintProvider, triggerInlineSuggest } from "@/features
 const SEED_IDLE_MS = 45_000;
 const SEED_PAUSE_MS = 1_800;
 const MAX_PROBLEM_TEXT_FILE_BYTES = 120_000;
+const MIN_NONWS_CHARS_AFTER_ACCEPT = 5;
 
 type Language = "cpp" | "python";
 type Mode = "SEED" | "FOCUS" | "SHADOW";
@@ -59,13 +63,44 @@ const templates: Record<Language, string> = {
 using namespace std;
 
 int main() {
-  cout << "Hello from C++" << endl;
+  // Your solution here
   return 0;
 }
 `,
-  python: `print("Hello from Python")
-`
+  python: `# Your solution here
+`,
 };
+
+type ModeCard = {
+  id: Mode;
+  tagline: string;
+  longDescription: string;
+  icon: typeof Leaf;
+};
+
+const MODE_CARDS: ModeCard[] = [
+  {
+    id: "SEED",
+    tagline: "Step-by-step teaching",
+    longDescription:
+      "Generates a structured teaching plan for your problem. Each step appears as ghost text at your cursor — press Tab to accept and move forward. Your next step only appears after you write code for the previous one.",
+    icon: Leaf,
+  },
+  {
+    id: "FOCUS",
+    tagline: "Logic-first mentoring",
+    longDescription:
+      "For students who know syntax but get stuck on logic. Click Hint to get a targeted hint at your chosen depth — it adapts to your current code and any errors you have.",
+    icon: Crosshair,
+  },
+  {
+    id: "SHADOW",
+    tagline: "Minimal intervention",
+    longDescription:
+      "Silent until you ask. Each Help click reveals exactly one brief nudge, then steps back. Hint depth escalates across clicks. Ideal for exam practice or competitive programming.",
+    icon: Zap,
+  },
+];
 
 export function CodeWorkspace() {
   const [language, setLanguage] = useState<Language>("cpp");
@@ -95,7 +130,7 @@ export function CodeWorkspace() {
     stderr: "",
     compileOutput: "",
     exitCode: 0,
-    error: ""
+    error: "",
   });
 
   const [seedSteps, setSeedSteps] = useState<string[]>([]);
@@ -103,6 +138,7 @@ export function CodeWorkspace() {
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedError, setSeedError] = useState<string | null>(null);
   const [problemFingerprint, setProblemFingerprint] = useState<string | null>(null);
+  const [waitingForCode, setWaitingForCode] = useState(false);
 
   const editorRef = useRef<import("monaco-editor").editor.IStandaloneCodeEditor | null>(null);
   const seedInlineDisposeRef = useRef<{ dispose: () => void } | null>(null);
@@ -117,38 +153,40 @@ export function CodeWorkspace() {
   const armIdleRef = useRef<() => void>(() => {});
   const fingerprintRef = useRef<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const requiresUserInputRef = useRef(false);
+  const codeAtAcceptNonwsRef = useRef(0);
 
   const hasProblemText = useMemo(
-    () => Boolean(problemDescription.trim() || constraints.trim() || inputOutputFormat.trim() || examples.trim()),
+    () =>
+      Boolean(
+        problemDescription.trim() || constraints.trim() || inputOutputFormat.trim() || examples.trim()
+      ),
     [problemDescription, constraints, inputOutputFormat, examples]
   );
 
-  const settingsSummary = useMemo(() => {
-    if (mode === "SEED") return "Step-by-step teaching";
-    if (mode === "FOCUS") return "Logic mentoring";
-    return "Minimal intervention";
-  }, [mode]);
+  const currentCard = MODE_CARDS.find((c) => c.id === mode) ?? MODE_CARDS[1];
 
-  useEffect(() => {
-    seedStepsRef.current = seedSteps;
-  }, [seedSteps]);
+  const depthLabel = useMemo(() => {
+    return (["", "Vague nudge", "Concept name", "Explanation", "Pseudocode", "Code snippet"] as const)[
+      hintSpecificity
+    ] ?? "Balanced";
+  }, [hintSpecificity]);
 
-  useEffect(() => {
-    modeRef.current = mode;
-  }, [mode]);
-
-  useEffect(() => {
-    hintDeliveryRef.current = hintDelivery;
-  }, [hintDelivery]);
-
-  useEffect(() => {
-    fingerprintRef.current = problemFingerprint;
-  }, [problemFingerprint]);
-
+  // ── Ref sync ──
+  useEffect(() => { seedStepsRef.current = seedSteps; }, [seedSteps]);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+  useEffect(() => { hintDeliveryRef.current = hintDelivery; }, [hintDelivery]);
+  useEffect(() => { fingerprintRef.current = problemFingerprint; }, [problemFingerprint]);
   useEffect(() => {
     seedBundleRef.current = { language, steps: seedSteps, frontier: seedFrontier };
   }, [language, seedSteps, seedFrontier]);
 
+  function setRequiresInput(val: boolean) {
+    requiresUserInputRef.current = val;
+    setWaitingForCode(val);
+  }
+
+  // ── Persistence ──
   const persistFrontier = useCallback(
     async (next: number) => {
       const fp = fingerprintRef.current;
@@ -161,8 +199,8 @@ export function CodeWorkspace() {
             problemFingerprint: fp,
             language,
             settingsKey: composeSeedSettingsKey(codeDisclosure, hintSpecificity),
-            frontierStep: next
-          })
+            frontierStep: next,
+          }),
         });
       } catch {
         // offline / transient — local progression still applies
@@ -171,6 +209,7 @@ export function CodeWorkspace() {
     [language, codeDisclosure, hintSpecificity]
   );
 
+  // ── Timers ──
   const armIdleTimer = useCallback(() => {
     if (idleTimerRef.current) {
       clearTimeout(idleTimerRef.current);
@@ -182,10 +221,11 @@ export function CodeWorkspace() {
     idleTimerRef.current = setTimeout(() => {
       idleTimerRef.current = null;
       if (modeRef.current !== "SEED" || hintDeliveryRef.current !== "automatic") return;
+      // Clear waiting flag on long idle so hint appears even without coding
+      requiresUserInputRef.current = false;
+      setWaitingForCode(false);
       const ed = editorRef.current;
-      if (ed) {
-        triggerInlineSuggest(ed);
-      }
+      if (ed) triggerInlineSuggest(ed);
     }, SEED_IDLE_MS);
   }, []);
 
@@ -200,42 +240,27 @@ export function CodeWorkspace() {
     typingTimerRef.current = setTimeout(() => {
       typingTimerRef.current = null;
       if (modeRef.current !== "SEED" || hintDeliveryRef.current !== "automatic") return;
+      if (requiresUserInputRef.current) return; // still waiting — don't show yet
       const ed = editorRef.current;
-      if (ed) {
-        triggerInlineSuggest(ed);
-      }
+      if (ed) triggerInlineSuggest(ed);
     }, SEED_PAUSE_MS);
   }, []);
 
-  useEffect(() => {
-    armIdleRef.current = armIdleTimer;
-  }, [armIdleTimer]);
+  useEffect(() => { armIdleRef.current = armIdleTimer; }, [armIdleTimer]);
 
   useEffect(() => {
     armIdleTimer();
     return () => {
-      if (idleTimerRef.current) {
-        clearTimeout(idleTimerRef.current);
-        idleTimerRef.current = null;
-      }
-      if (typingTimerRef.current) {
-        clearTimeout(typingTimerRef.current);
-        typingTimerRef.current = null;
-      }
+      if (idleTimerRef.current) { clearTimeout(idleTimerRef.current); idleTimerRef.current = null; }
+      if (typingTimerRef.current) { clearTimeout(typingTimerRef.current); typingTimerRef.current = null; }
     };
   }, [
-    armIdleTimer,
-    code,
-    problemTitle,
-    problemDescription,
-    constraints,
-    inputOutputFormat,
-    examples,
-    hintDelivery,
-    mode,
-    seedSteps.length
+    armIdleTimer, code, problemTitle, problemDescription,
+    constraints, inputOutputFormat, examples,
+    hintDelivery, mode, seedSteps.length,
   ]);
 
+  // ── Mode change cleanup ──
   useEffect(() => {
     if (mode !== "SEED") {
       setSeedSteps([]);
@@ -243,9 +268,11 @@ export function CodeWorkspace() {
       setProblemFingerprint(null);
       setSeedError(null);
       setSeedLoading(false);
+      setRequiresInput(false);
     }
   }, [mode]);
 
+  // ── SEED bootstrap ──
   useEffect(() => {
     if (mode !== "SEED" || !hasProblemText) {
       if (mode === "SEED" && !hasProblemText) {
@@ -253,6 +280,7 @@ export function CodeWorkspace() {
         setSeedError(null);
         setSeedSteps([]);
         setProblemFingerprint(null);
+        setRequiresInput(false);
       }
       return;
     }
@@ -269,7 +297,7 @@ export function CodeWorkspace() {
             description: problemDescription,
             constraints,
             inputOutputFormat,
-            examples
+            examples,
           });
 
           const res = await fetch("/api/guidance/seed/bootstrap", {
@@ -283,8 +311,8 @@ export function CodeWorkspace() {
               examples,
               language,
               codeDisclosure,
-              hintSpecificity
-            })
+              hintSpecificity,
+            }),
           });
 
           const data = (await res.json()) as {
@@ -301,7 +329,9 @@ export function CodeWorkspace() {
             return;
           }
 
-          const steps = Array.isArray(data.steps) ? data.steps.filter((s) => typeof s === "string" && s.trim()) : [];
+          const steps = Array.isArray(data.steps)
+            ? data.steps.filter((s) => typeof s === "string" && s.trim())
+            : [];
           if (steps.length === 0) {
             setSeedError("Guidance could not be loaded.");
             setSeedSteps([]);
@@ -313,6 +343,7 @@ export function CodeWorkspace() {
           setSeedFrontier(1);
           setSeedError(null);
           setCurrentHint("");
+          setRequiresInput(false);
         } catch {
           if (gen === bootstrapGenRef.current) {
             setSeedError("Could not prepare guided steps.");
@@ -326,16 +357,9 @@ export function CodeWorkspace() {
 
     return () => clearTimeout(debounce);
   }, [
-    mode,
-    hasProblemText,
-    problemTitle,
-    problemDescription,
-    constraints,
-    inputOutputFormat,
-    examples,
-    language,
-    codeDisclosure,
-    hintSpecificity
+    mode, hasProblemText, problemTitle, problemDescription,
+    constraints, inputOutputFormat, examples,
+    language, codeDisclosure, hintSpecificity,
   ]);
 
   useEffect(
@@ -348,35 +372,31 @@ export function CodeWorkspace() {
     []
   );
 
+  // ── Problem file parse ──
   async function parseProblemText(rawText: string): Promise<ParsedProblemPayload> {
     const response = await fetch("/api/guidance/problem/parse-text", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: rawText })
+      body: JSON.stringify({ text: rawText }),
     });
     const payload = (await response.json()) as Partial<ParsedProblemPayload> & { error?: string };
-    if (!response.ok) {
-      throw new Error(payload.error || "Could not parse file.");
-    }
+    if (!response.ok) throw new Error(payload.error || "Could not parse file.");
     return {
       title: payload.title?.trim() || "",
       description: payload.description?.trim() || "",
       constraints: payload.constraints?.trim() || "",
       inputOutputFormat: payload.inputOutputFormat?.trim() || "",
-      examples: payload.examples?.trim() || ""
+      examples: payload.examples?.trim() || "",
     };
   }
 
   async function handleProblemTextUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-
     try {
       setParsingProblemFile(true);
       setFileParseNotice(null);
-      if (file.size > MAX_PROBLEM_TEXT_FILE_BYTES) {
-        throw new Error("File is too large. Use a smaller plain text statement.");
-      }
+      if (file.size > MAX_PROBLEM_TEXT_FILE_BYTES) throw new Error("File too large. Use a smaller plain-text statement.");
       const rawText = await file.text();
       const parsed = await parseProblemText(rawText);
       setProblemTitle(parsed.title);
@@ -384,7 +404,7 @@ export function CodeWorkspace() {
       setConstraints(parsed.constraints);
       setInputOutputFormat(parsed.inputOutputFormat);
       setExamples(parsed.examples);
-      setFileParseNotice("Problem fields detected and filled. Review and adjust if needed.");
+      setFileParseNotice("Problem fields filled from file — review and adjust as needed.");
     } catch (error) {
       setFileParseNotice(error instanceof Error ? error.message : "Could not parse this file.");
     } finally {
@@ -393,6 +413,7 @@ export function CodeWorkspace() {
     }
   }
 
+  // ── SEED step accept (Copilot-like: require code before next step) ──
   const handleSeedAccept = useCallback(() => {
     setSeedFrontier((f) => {
       const max = seedStepsRef.current.length;
@@ -400,15 +421,18 @@ export function CodeWorkspace() {
       if (next !== f && next <= max) {
         void persistFrontier(next);
         setHintsUsed((h) => h + 1);
+        requiresUserInputRef.current = true;
+        setWaitingForCode(true);
+        const currentCode = editorRef.current?.getValue() ?? "";
+        codeAtAcceptNonwsRef.current = currentCode.replace(/\s/g, "").length;
       }
       return next;
     });
   }, [persistFrontier]);
 
-  useEffect(() => {
-    handleSeedAcceptRef.current = handleSeedAccept;
-  }, [handleSeedAccept]);
+  useEffect(() => { handleSeedAcceptRef.current = handleSeedAccept; }, [handleSeedAccept]);
 
+  // ── Editor mount ──
   const handleEditorMount: OnMount = useCallback(
     (editor, monaco) => {
       editorRef.current = editor;
@@ -418,6 +442,7 @@ export function CodeWorkspace() {
         editor,
         () => {
           if (modeRef.current !== "SEED") return null;
+          if (requiresUserInputRef.current) return null; // waiting for user to write code
           const b = seedBundleRef.current;
           if (b.frontier > b.steps.length) return null;
           const idx = b.frontier - 1;
@@ -429,11 +454,27 @@ export function CodeWorkspace() {
       );
 
       editor.onDidChangeModelContent(() => {
+        if (requiresUserInputRef.current) {
+          const nonws = editor.getValue().replace(/\s/g, "").length;
+          const delta = nonws - codeAtAcceptNonwsRef.current;
+          if (delta >= MIN_NONWS_CHARS_AFTER_ACCEPT) {
+            requiresUserInputRef.current = false;
+            setWaitingForCode(false);
+            armTypingPauseHint();
+          }
+          armIdleRef.current();
+          return;
+        }
         armTypingPauseHint();
         armIdleRef.current();
       });
+
       editor.onDidChangeCursorPosition(() => {
-        if (modeRef.current === "SEED" && hintDeliveryRef.current === "automatic") {
+        if (
+          modeRef.current === "SEED" &&
+          hintDeliveryRef.current === "automatic" &&
+          !requiresUserInputRef.current
+        ) {
           armTypingPauseHint();
         }
       });
@@ -446,6 +487,7 @@ export function CodeWorkspace() {
     setCode(templates[next]);
   }
 
+  // ── Gemini hint request ──
   async function requestGeminiHint(forAutomatic = false) {
     const clampedSeedStep =
       mode === "SEED"
@@ -453,23 +495,26 @@ export function CodeWorkspace() {
           ? Math.min(Math.max(seedFrontier, 1), seedSteps.length)
           : 1
         : 1;
+
     const body = {
       mode,
       language,
       depth: hintSpecificity,
-      problem: [problemTitle, problemDescription, constraints, inputOutputFormat, examples].filter(Boolean).join("\n\n"),
+      problem: [problemTitle, problemDescription, constraints, inputOutputFormat, examples]
+        .filter(Boolean)
+        .join("\n\n"),
       hasCode: code.trim().length > 0 && code.trim() !== templates[language].trim(),
       userCode: code,
       userError: [execution.error, execution.stderr, execution.compileOutput].filter(Boolean).join("\n"),
       step: clampedSeedStep,
       totalSteps: mode === "SEED" ? Math.max(seedSteps.length, 1) : 1,
-      helpClickNumber: mode === "SHADOW" ? shadowHelpClick + 1 : 1
+      helpClickNumber: mode === "SHADOW" ? shadowHelpClick + 1 : 1,
     };
 
     const response = await fetch("/api/guidance/hint", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
     });
     const data = (await response.json()) as { hint?: string; error?: string };
     if (!response.ok || !data.hint) {
@@ -477,214 +522,197 @@ export function CodeWorkspace() {
       return;
     }
     setCurrentHint(data.hint);
-    setHintsUsed((value) => value + 1);
-    if (mode === "SHADOW") {
-      setShadowHelpClick((v) => Math.min(v + 1, 5));
-    }
+    setHintsUsed((v) => v + 1);
+    if (mode === "SHADOW") setShadowHelpClick((v) => Math.min(v + 1, 5));
   }
 
+  // ── Code execution ──
   async function execute(type: "run" | "submit") {
     setRunning(true);
-    setExecution({
-      output: "",
-      stdout: "",
-      stderr: "",
-      compileOutput: "",
-      exitCode: 0,
-      error: ""
-    });
+    setExecution({ output: "", stdout: "", stderr: "", compileOutput: "", exitCode: 0, error: "" });
     try {
       const response = await fetch("/api/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          language,
-          code,
-          stdin
-        })
+        body: JSON.stringify({ language, code, stdin }),
       });
       const data = await response.json();
       if (!response.ok) {
-        setExecution((prev) => ({
-          ...prev,
-          error: data.error || "Execution failed."
-        }));
+        setExecution((prev) => ({ ...prev, error: data.error || "Execution failed." }));
         return;
       }
-
       setExecution({
         output: data.output ?? "",
         stdout: data.stdout ?? "",
         stderr: data.stderr ?? "",
         compileOutput: data.compileOutput ?? "",
         exitCode: data.exitCode ?? 0,
-        error: ""
+        error: "",
       });
-
-      if (mode === "SEED" && seedStepsRef.current.length > 0 && hintDelivery === "automatic") {
+      if (
+        mode === "SEED" &&
+        seedStepsRef.current.length > 0 &&
+        hintDelivery === "automatic" &&
+        !requiresUserInputRef.current
+      ) {
         queueMicrotask(() => {
           const ed = editorRef.current;
           if (ed) triggerInlineSuggest(ed);
         });
       }
-
-      if (type === "submit" && hintDelivery === "automatic" && mode !== "SHADOW" && mode !== "SEED" && hasProblemText) {
+      if (
+        type === "submit" &&
+        hintDelivery === "automatic" &&
+        mode !== "SHADOW" &&
+        mode !== "SEED" &&
+        hasProblemText
+      ) {
         await requestGeminiHint(true);
       }
     } catch {
-      setExecution((prev) => ({
-        ...prev,
-        error: "Unexpected error while running code."
-      }));
+      setExecution((prev) => ({ ...prev, error: "Unexpected error while running code." }));
     } finally {
       setRunning(false);
     }
   }
 
+  // ── Hint button ──
   function requestHint() {
     if (mode === "SEED") {
       if (!seedSteps.length) {
         setCurrentHint(
-          seedLoading ? "Getting your guided sequence ready…" : seedError ?? "Add problem details on the left to enable guidance."
+          seedLoading
+            ? "Getting your guided sequence ready…"
+            : (seedError ?? "Add problem details on the left to enable guidance.")
         );
         return;
       }
       if (seedFrontier > seedSteps.length) {
-        setCurrentHint("Great progress. You have completed all guided SEED steps for this problem.");
+        setCurrentHint("All guided steps complete. Great work!");
         return;
       }
+      // Explicit click overrides the waiting-for-code gate
+      setRequiresInput(false);
       const ed = editorRef.current;
       if (ed) triggerInlineSuggest(ed);
-      setHintsUsed((value) => value + 1);
+      setHintsUsed((v) => v + 1);
       return;
     }
-
     void requestGeminiHint(false);
   }
 
-  const modeCards: Array<{
-    id: Mode;
-    title: string;
-    tagline: string;
-    description: string;
-    icon: typeof Leaf;
-    accent: string;
-  }> = [
-    {
-      id: "SEED",
-      title: "SEED",
-      tagline: "Foundational guidance",
-      description:
-        "Starts from scratch in very small steps—one idea at a time—so you learn how to think before you rush to code.",
-      icon: Leaf,
-      accent: "from-primary/15 to-transparent"
-    },
-    {
-      id: "FOCUS",
-      title: "FOCUS",
-      tagline: "Logic-first mentoring",
-      description:
-        "For when you already know the basics but you are stuck on the core idea—hints stay strategic, not tutorial.",
-      icon: Crosshair,
-      accent: "from-secondary/15 to-transparent"
-    },
-    {
-      id: "SHADOW",
-      title: "SHADOW",
-      tagline: "Minimal nudges",
-      description:
-        "Quiet until you ask. Each request gives one brief nudge—exam-style—then it steps back again.",
-      icon: Zap,
-      accent: "from-muted-foreground/10 to-transparent"
-    }
-  ];
-
+  // ─────────────────────────────────────────
+  //  RENDER
+  // ─────────────────────────────────────────
   return (
-    <div className="mx-auto flex min-h-0 w-full max-w-[1280px] flex-1 flex-col gap-4 px-3 py-4 sm:px-4 md:px-6">
-      <section className="rounded-2xl border border-border bg-card/90 p-4 shadow-sm">
+    <div className="flex flex-1 flex-col overflow-hidden">
+
+      {/* ── Guidance bar ── */}
+      <div className="shrink-0 border-b border-border bg-card px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="text-xs font-semibold tracking-[0.2em] text-primary uppercase">Guidance Studio</p>
-          <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-muted-foreground">
-            {settingsSummary}
-          </span>
-          <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-muted-foreground">
-            Hints used: <span className="font-medium text-foreground">{hintsUsed}</span>
-          </span>
-          {mode === "SEED" ? (
+          {/* Mode toggle */}
+          <div className="inline-flex items-center gap-px rounded-lg border border-border bg-background p-1">
+            {MODE_CARDS.map((card) => {
+              const Icon = card.icon;
+              const selected = mode === card.id;
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  onClick={() => { setMode(card.id); setShadowHelpClick(0); setCurrentHint(""); }}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-all",
+                    selected
+                      ? "bg-primary text-primary-foreground shadow-sm"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  )}
+                >
+                  <Icon className="size-3.5" />
+                  {card.id}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Status chips */}
+          {mode === "SEED" && (
             <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-muted-foreground">
-              Step {seedSteps.length ? `${Math.min(seedFrontier, seedSteps.length)} / ${seedSteps.length}` : "—"}
+              {seedLoading
+                ? "Preparing…"
+                : seedSteps.length
+                ? `Step ${Math.min(seedFrontier, seedSteps.length)} / ${seedSteps.length}`
+                : "Add problem →"}
             </span>
-          ) : null}
-          <Button variant="ghost" size="sm" className="ml-auto h-8 px-2" onClick={() => setGuidanceExpanded((v) => !v)}>
-            {guidanceExpanded ? "Hide details" : "Show details"}
-            <ChevronDown className={cn("size-4 transition-transform", guidanceExpanded && "rotate-180")} />
-          </Button>
+          )}
+          {mode === "SHADOW" && (
+            <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-muted-foreground">
+              Nudges: {shadowHelpClick} / 5
+            </span>
+          )}
+          <span className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] text-muted-foreground">
+            {hintsUsed} hint{hintsUsed !== 1 ? "s" : ""} used
+          </span>
+
+          <button
+            type="button"
+            onClick={() => setGuidanceExpanded((v) => !v)}
+            className="ml-auto flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <Settings className="size-3.5" />
+            Settings
+            <ChevronDown className={cn("size-3 transition-transform", guidanceExpanded && "rotate-180")} />
+          </button>
         </div>
 
-        <div className="mt-3 grid gap-2 md:grid-cols-3">
-          {modeCards.map((card) => {
-            const Icon = card.icon;
-            const selected = mode === card.id;
-            return (
-              <button
-                key={card.id}
-                type="button"
-                onClick={() => {
-                  setMode(card.id);
-                  setShadowHelpClick(0);
-                  setCurrentHint("");
-                }}
-                className={cn(
-                  "flex items-start gap-3 rounded-xl border p-3 text-left transition-all",
-                  selected ? "border-primary bg-primary/10 ring-1 ring-primary/30" : "border-border bg-background hover:bg-accent/30"
-                )}
-              >
-                <div className="grid size-9 shrink-0 place-content-center rounded-md border border-border bg-card">
-                  <Icon className="size-4.5 text-primary" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold">{card.title}</p>
-                  <p className="text-[11px] text-muted-foreground">{card.tagline}</p>
-                </div>
-              </button>
-            );
-          })}
-        </div>
+        {/* Mode description */}
+        <p className="mt-1.5 text-xs leading-relaxed text-muted-foreground">{currentCard.longDescription}</p>
 
-        {guidanceExpanded ? (
-          <div className="mt-3 grid gap-3 border-t border-border pt-3 md:grid-cols-2 xl:grid-cols-3">
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2 text-xs">
+        {/* Settings panel */}
+        {guidanceExpanded && (
+          <div className="mt-3 grid gap-4 border-t border-border pt-3 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs">
                 <Eye className="size-3.5 text-primary" />
-                Code shown in mentor messages
+                Code in hints
               </Label>
               <select
-                className="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs text-foreground"
                 value={codeDisclosure}
                 onChange={(e) => setCodeDisclosure(e.target.value as CodeDisclosure)}
               >
-                <option value="no_code">No code examples</option>
-                <option value="allow_minimal_code">Tiny snippets allowed</option>
+                <option value="no_code">Text only — no code shown</option>
+                <option value="allow_minimal_code">Allow small code snippets</option>
               </select>
+              <p className="text-[10px] text-muted-foreground">
+                Controls whether hints may include partial {language === "cpp" ? "C++" : "Python"} fragments.
+                Keeping code off makes you work through syntax independently.
+              </p>
             </div>
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2 text-xs">
-                <MessageSquare className="size-3.5 text-primary" />
-                Hint delivery
-              </Label>
-              <select
-                className="h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
-                value={hintDelivery}
-                onChange={(e) => setHintDelivery(e.target.value as HintDelivery)}
-              >
-                <option value="on_demand">On demand</option>
-                <option value="automatic">Automatic while coding</option>
-              </select>
-            </div>
-            <div className="space-y-2 md:col-span-2 xl:col-span-1">
-              <Label className="flex items-center gap-2 text-xs">
+
+            {mode === "SEED" && (
+              <div className="space-y-1.5">
+                <Label className="flex items-center gap-1.5 text-xs">
+                  <MessageSquare className="size-3.5 text-primary" />
+                  Hint delivery
+                </Label>
+                <select
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-xs text-foreground"
+                  value={hintDelivery}
+                  onChange={(e) => setHintDelivery(e.target.value as HintDelivery)}
+                >
+                  <option value="on_demand">On demand — click Show Step</option>
+                  <option value="automatic">Automatic — appear while coding</option>
+                </select>
+                <p className="text-[10px] text-muted-foreground">
+                  Automatic shows ghost text after a short typing pause. Press Tab to accept a step and advance.
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5 text-xs">
                 <Target className="size-3.5 text-primary" />
-                Hint depth: {hintSpecificity}
+                Hint depth: {hintSpecificity} — {depthLabel}
               </Label>
               <input
                 type="range"
@@ -692,185 +720,346 @@ export function CodeWorkspace() {
                 max={5}
                 value={hintSpecificity}
                 onChange={(e) => setHintSpecificity(Number(e.target.value))}
-                className="w-full"
+                className="w-full accent-primary"
+              />
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>1 Conceptual</span>
+                <span>3 Balanced</span>
+                <span>5 Direct code</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Three-panel workspace ── */}
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+
+        {/* ── LEFT: Problem panel ── */}
+        <div className="flex w-[272px] shrink-0 flex-col overflow-hidden border-r border-border">
+          <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
+            <h2 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Problem
+            </h2>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 gap-1 px-2 text-[11px]"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={parsingProblemFile}
+            >
+              {parsingProblemFile ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <Upload className="size-3" />
+              )}
+              Import .txt
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".txt,text/plain"
+              className="hidden"
+              onChange={handleProblemTextUpload}
+            />
+          </div>
+
+          <div className="flex-1 space-y-3.5 overflow-y-auto p-3">
+            {fileParseNotice && (
+              <div className="flex items-start gap-2 rounded-md border border-border bg-muted/40 p-2.5 text-[11px] leading-relaxed text-muted-foreground">
+                <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-primary" />
+                <span>{fileParseNotice}</span>
+              </div>
+            )}
+
+            <div className="space-y-1">
+              <Label className="text-[11px]" htmlFor="problem-title">
+                Title
+              </Label>
+              <Input
+                id="problem-title"
+                className="h-8 text-sm"
+                value={problemTitle}
+                onChange={(e) => setProblemTitle(e.target.value)}
+                placeholder="e.g. Two Sum"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px]" htmlFor="problem-description">
+                Description
+              </Label>
+              <textarea
+                id="problem-description"
+                className="min-h-[110px] w-full resize-y rounded-md border border-input bg-transparent p-2.5 text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                value={problemDescription}
+                onChange={(e) => setProblemDescription(e.target.value)}
+                placeholder="Describe the problem clearly…"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px]" htmlFor="problem-constraints">
+                Constraints
+              </Label>
+              <textarea
+                id="problem-constraints"
+                className="min-h-[56px] w-full resize-y rounded-md border border-input bg-transparent p-2.5 text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                value={constraints}
+                onChange={(e) => setConstraints(e.target.value)}
+                placeholder="1 ≤ n ≤ 10⁵…"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px]" htmlFor="problem-io">
+                Input / Output format
+              </Label>
+              <textarea
+                id="problem-io"
+                className="min-h-[56px] w-full resize-y rounded-md border border-input bg-transparent p-2.5 text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                value={inputOutputFormat}
+                onChange={(e) => setInputOutputFormat(e.target.value)}
+                placeholder={"Input: …\nOutput: …"}
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px]" htmlFor="problem-examples">
+                Examples
+              </Label>
+              <textarea
+                id="problem-examples"
+                className="min-h-[90px] w-full resize-y rounded-md border border-input bg-transparent p-2.5 text-sm leading-relaxed focus:outline-none focus:ring-1 focus:ring-ring"
+                value={examples}
+                onChange={(e) => setExamples(e.target.value)}
+                placeholder={"Input: 5\nOutput: 5\nExplanation: …"}
               />
             </div>
           </div>
-        ) : null}
-      </section>
+        </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-4">
-        <section className="max-h-[18vh] min-h-[140px] space-y-3 overflow-y-auto rounded-xl border border-border bg-card p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">Problem</h2>
-            <div className="flex items-center gap-2">
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".txt,text/plain"
-                className="hidden"
-                onChange={handleProblemTextUpload}
-              />
+        {/* ── CENTER: Editor panel ── */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          {/* Toolbar */}
+          <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-border px-3 py-2">
+            <div className="inline-flex items-center gap-px rounded-lg border border-border bg-background p-0.5">
               <Button
-                variant="outline"
+                variant={language === "cpp" ? "default" : "ghost"}
                 size="sm"
-                className="h-8"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={parsingProblemFile}
+                className="h-7 px-3 text-xs"
+                onClick={() => switchLanguage("cpp")}
               >
-                {parsingProblemFile ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
-                Import .txt
-              </Button>
-            </div>
-          </div>
-          <p className="text-xs text-muted-foreground">Upload a plain text statement and fields will auto-fill.</p>
-          {fileParseNotice ? (
-            <p className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">{fileParseNotice}</p>
-          ) : null}
-          <div className="space-y-2">
-            <Label htmlFor="problem-title">Title</Label>
-            <Input id="problem-title" value={problemTitle} onChange={(e) => setProblemTitle(e.target.value)} className="h-10" />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="problem-description">Description</Label>
-            <textarea
-              id="problem-description"
-              className="min-h-28 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-              value={problemDescription}
-              onChange={(e) => setProblemDescription(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="problem-constraints">Constraints</Label>
-            <textarea
-              id="problem-constraints"
-              className="min-h-16 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-              value={constraints}
-              onChange={(e) => setConstraints(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="problem-io">Input / Output</Label>
-            <textarea
-              id="problem-io"
-              className="min-h-16 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-              value={inputOutputFormat}
-              onChange={(e) => setInputOutputFormat(e.target.value)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="problem-examples">Examples</Label>
-            <textarea
-              id="problem-examples"
-              className="min-h-16 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-              value={examples}
-              onChange={(e) => setExamples(e.target.value)}
-            />
-          </div>
-        </section>
-
-        <section className="grid min-h-[72vh] flex-1 gap-4 lg:grid-cols-[1.85fr_1fr]">
-          <section className="flex min-h-0 flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <Button variant={language === "cpp" ? "default" : "outline"} onClick={() => switchLanguage("cpp")}>
                 C++
               </Button>
-              <Button variant={language === "python" ? "default" : "outline"} onClick={() => switchLanguage("python")}>
+              <Button
+                variant={language === "python" ? "default" : "ghost"}
+                size="sm"
+                className="h-7 px-3 text-xs"
+                onClick={() => switchLanguage("python")}
+              >
                 Python
               </Button>
-              <div className="ml-auto flex items-center gap-2">
-                {mode === "SEED" && seedLoading ? (
-                  <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                    <Loader2 className="size-3.5 animate-spin" />
-                    Preparing
+            </div>
+
+            {mode === "SEED" && seedLoading && (
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Loader2 className="size-3 animate-spin" />
+                Preparing guide…
+              </span>
+            )}
+            {mode === "SEED" && waitingForCode && seedSteps.length > 0 && (
+              <span className="flex items-center gap-1.5 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs text-primary">
+                <Keyboard className="size-3" />
+                Code step {Math.max(seedFrontier - 1, 1)}, then step {Math.min(seedFrontier, seedSteps.length)} appears
+              </span>
+            )}
+
+            <div className="ml-auto flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                className="h-8 gap-1.5 px-3 text-xs"
+                onClick={requestHint}
+                disabled={mode === "SEED" && seedLoading}
+              >
+                <Sparkles className="size-3.5" />
+                {mode === "SEED" ? "Show Step" : mode === "SHADOW" ? `Nudge ${shadowHelpClick + 1}` : "Hint"}
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 gap-1.5 px-3 text-xs"
+                onClick={() => execute("run")}
+                disabled={running}
+              >
+                {running ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5" />}
+                Run
+              </Button>
+              <Button
+                className="h-8 px-4 text-xs"
+                onClick={() => execute("submit")}
+                disabled={running}
+              >
+                {running ? "Running…" : "Submit"}
+              </Button>
+            </div>
+          </div>
+
+          {seedError && mode === "SEED" && (
+            <div className="shrink-0 border-b border-destructive/30 bg-destructive/10 px-4 py-2 text-xs text-destructive">
+              {seedError}
+            </div>
+          )}
+
+          {/* Monaco — fills all remaining vertical space */}
+          <div className="min-h-0 flex-1">
+            <Editor
+              height="100%"
+              language={language === "cpp" ? "cpp" : "python"}
+              value={code}
+              onChange={(value) => setCode(value ?? "")}
+              onMount={handleEditorMount}
+              theme="vs-dark"
+              options={{
+                minimap: { enabled: false },
+                fontSize: 14,
+                tabSize: 2,
+                automaticLayout: true,
+                inlineSuggest: { enabled: true },
+                scrollBeyondLastLine: false,
+                padding: { top: 12, bottom: 12 },
+                fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+                fontLigatures: true,
+                lineNumbers: "on",
+                renderLineHighlight: "line",
+                cursorBlinking: "smooth",
+              }}
+            />
+          </div>
+
+          {/* Stdin */}
+          <div className="shrink-0 border-t border-border px-3 py-2.5">
+            <Label className="mb-1.5 block text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              stdin
+            </Label>
+            <textarea
+              className="h-[64px] w-full resize-none rounded-md border border-input bg-transparent px-3 py-2 font-mono text-sm focus:outline-none focus:ring-1 focus:ring-ring"
+              value={stdin}
+              onChange={(e) => setStdin(e.target.value)}
+              placeholder="Standard input for your program…"
+            />
+          </div>
+        </div>
+
+        {/* ── RIGHT: Console panel ── */}
+        <div className="flex w-[300px] shrink-0 flex-col overflow-hidden border-l border-border">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+            <TerminalSquare className="size-3.5 text-primary" />
+            <h3 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+              Console
+            </h3>
+            <span
+              className={cn(
+                "ml-auto rounded-full px-2 py-0.5 text-[10px] font-medium",
+                execution.exitCode === 0 && (execution.stdout || execution.output)
+                  ? "bg-green-500/15 text-green-500"
+                  : execution.exitCode !== 0
+                  ? "bg-destructive/15 text-destructive"
+                  : "bg-muted text-muted-foreground"
+              )}
+            >
+              Exit {execution.exitCode}
+            </span>
+          </div>
+
+          <div className="flex-1 space-y-3 overflow-y-auto p-3">
+            {execution.error && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2.5 text-xs text-destructive">
+                {execution.error}
+              </div>
+            )}
+
+            <ConsoleBlock label="Compile" content={execution.compileOutput} empty="No compile output" />
+            <ConsoleBlock
+              label="Output"
+              content={execution.stdout || execution.output}
+              empty="No output yet"
+              minHeight="min-h-[64px]"
+            />
+            <ConsoleBlock label="Errors" content={execution.stderr} empty="No runtime errors" />
+
+            {/* SEED progress tracker */}
+            {mode === "SEED" && seedSteps.length > 0 && (
+              <div className="rounded-md border border-primary/20 bg-primary/5 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold text-primary">
+                    <FileText className="size-3.5" />
+                    Guided steps
+                  </p>
+                  <span className="text-[11px] text-muted-foreground">
+                    {Math.min(seedFrontier - 1, seedSteps.length)} / {seedSteps.length} done
                   </span>
-                ) : null}
-                <Button variant="outline" className="h-9" onClick={() => requestHint()}>
-                  <Sparkles className="size-4" />
-                  Hint
-                </Button>
-                <Button variant="outline" className="h-9" onClick={() => execute("run")} disabled={running}>
-                  {running ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
-                  Run
-                </Button>
-                <Button className="h-9" onClick={() => execute("submit")} disabled={running}>
-                  {running ? "Submitting..." : "Submit"}
-                </Button>
-              </div>
-            </div>
-
-            {seedError && mode === "SEED" ? (
-              <p className="mb-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">{seedError}</p>
-            ) : null}
-            <div className="min-h-0 flex-1 overflow-hidden rounded-lg border border-border">
-              <Editor
-                height="100%"
-                language={language === "cpp" ? "cpp" : "python"}
-                value={code}
-                onChange={(value) => setCode(value ?? "")}
-                onMount={handleEditorMount}
-                theme="vs-dark"
-                options={{
-                  minimap: { enabled: false },
-                  fontSize: 14,
-                  tabSize: 2,
-                  automaticLayout: true,
-                  inlineSuggest: { enabled: true }
-                }}
-              />
-            </div>
-
-            <div className="mt-3 space-y-2">
-              <Label htmlFor="stdin">Program input (stdin)</Label>
-              <textarea
-                id="stdin"
-                className="min-h-16 w-full rounded-md border border-input bg-transparent p-3 text-sm"
-                value={stdin}
-                onChange={(e) => setStdin(e.target.value)}
-                placeholder="Provide stdin data here..."
-              />
-            </div>
-          </section>
-
-          <section className="flex min-h-0 flex-col rounded-xl border border-border bg-card p-4 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
-              <TerminalSquare className="size-4 text-primary" />
-              <h3 className="font-semibold">Output & Error Console</h3>
-            </div>
-            {execution.error ? <p className="mb-3 text-sm text-destructive">{execution.error}</p> : null}
-            <div className="min-h-0 flex-1 space-y-3 overflow-y-auto text-sm">
-              <div className="rounded-md border border-border bg-background/70 p-3">
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Compile Logs</p>
-                <pre className="overflow-x-auto whitespace-pre-wrap">{execution.compileOutput || "No compile logs."}</pre>
-              </div>
-              <div className="rounded-md border border-border bg-background/70 p-3">
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Program Output</p>
-                <pre className="overflow-x-auto whitespace-pre-wrap">{execution.stdout || execution.output || "No output."}</pre>
-              </div>
-              <div className="rounded-md border border-border bg-background/70 p-3">
-                <p className="mb-1 text-xs font-medium text-muted-foreground">Runtime Errors</p>
-                <pre className="overflow-x-auto whitespace-pre-wrap">{execution.stderr || "No runtime errors."}</pre>
-              </div>
-            </div>
-            {mode === "SEED" && seedSteps.length > 0 ? (
-              <div className="mt-3 rounded-md border border-border bg-muted/40 p-3 text-xs leading-relaxed text-muted-foreground">
-                <p className="flex items-center gap-1.5 font-medium text-foreground">
-                  <FileText className="size-3.5" />
-                  Inline guidance
+                </div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-1.5 rounded-full bg-primary transition-all duration-500"
+                    style={{
+                      width: `${(Math.min(seedFrontier - 1, seedSteps.length) / seedSteps.length) * 100}%`,
+                    }}
+                  />
+                </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+                  {waitingForCode
+                    ? "✏ Write code for the accepted step — your next step will then appear."
+                    : seedFrontier > seedSteps.length
+                    ? "✓ All steps complete."
+                    : `Step ${Math.min(seedFrontier, seedSteps.length)} ready — look for the ghost text at your cursor.`}
                 </p>
-                <p className="mt-1">Hints appear at your cursor like Copilot ghost text. Press Tab to accept a step comment.</p>
               </div>
-            ) : null}
-            {currentHint ? (
-              <div className="mt-3 rounded-md border border-primary/30 bg-primary/10 p-3 text-sm">
-                <p className="mb-1 font-medium text-primary">{mode === "SEED" ? "Notice" : "Current Hint"}</p>
-                <p>{currentHint}</p>
+            )}
+
+            {/* Current hint */}
+            {currentHint && (
+              <div className="rounded-md border border-primary/30 bg-primary/10 p-3">
+                <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-primary">
+                  <Sparkles className="size-3" />
+                  {mode === "SEED" ? "Step Note" : mode === "SHADOW" ? "Nudge" : "Hint"}
+                </p>
+                <p className="text-sm leading-relaxed text-foreground">{currentHint}</p>
               </div>
-            ) : null}
-            <p className="mt-3 text-xs text-muted-foreground">Exit code: {execution.exitCode}</p>
-          </section>
-        </section>
+            )}
+          </div>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function ConsoleBlock({
+  label,
+  content,
+  empty,
+  minHeight = "min-h-[44px]",
+}: {
+  label: string;
+  content: string;
+  empty: string;
+  minHeight?: string;
+}) {
+  return (
+    <div>
+      <p className="mb-1.5 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+        <span className="h-px flex-1 bg-border" />
+        {label}
+        <span className="h-px flex-1 bg-border" />
+      </p>
+      <pre
+        className={cn(
+          "rounded-md border border-border bg-black/20 p-2.5 font-mono text-[11.5px] leading-relaxed whitespace-pre-wrap break-all text-foreground",
+          minHeight
+        )}
+      >
+        {content || <span className="italic text-muted-foreground">{empty}</span>}
+      </pre>
     </div>
   );
 }

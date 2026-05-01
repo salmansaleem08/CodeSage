@@ -16,7 +16,7 @@ export default async function EditorPage() {
   }
 
   return (
-    <main className="flex min-h-dvh flex-col bg-background text-foreground">
+    <main className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       <AppHeader />
       <CodeWorkspace />
     </main>

@@ -130,54 +130,63 @@ export async function generateSeedStepsWithGemini(params: SeedPlanParams): Promi
         ? "Steps may be slightly larger but still single-concept; be direct about what to think about next."
         : "Balance clarity and brevity for a motivated beginner.";
 
-  const prompt = `You are designing a SEED-mode teaching plan for a programming learner (possibly zero prior experience).
+  const prompt = `You are designing a SEED-mode teaching plan for a programming learner who may have zero prior experience.
 
-Problem title:
-${params.problemTitle || "(untitled)"}
+Problem title: ${params.problemTitle || "(untitled)"}
 
 Description:
 ${params.problemDescription}
 
-Constraints:
-${params.constraints || "(none)"}
+Constraints: ${params.constraints || "(none)"}
+Input / output format: ${params.inputOutputFormat || "(unspecified)"}
+Examples: ${params.examples || "(none)"}
 
-Input / output format:
-${params.inputOutputFormat || "(unspecified)"}
+Target language: ${params.language === "cpp" ? "C++" : "Python"}
 
-Examples:
-${params.examples || "(none)"}
+RULES — follow exactly:
+1. Produce exactly ${count} ordered steps. Each step introduces exactly ONE new concept or action.
+2. Each step is 1–2 sentences maximum. No paragraphs.
+3. Steps must be specific to THIS problem — not generic programming advice.
+4. Do NOT include a full solution, complete pseudocode, or any step that reveals the whole answer.
+5. Assume the learner may know nothing — do not skip prerequisites.
+6. Progression must follow: understand input → store data → core logic (1 concept per step) → output.
+7. ${codeRule}
+8. ${specificityGuide}
+9. Use a supportive mentor voice: "Think about…", "You need…", "Notice that…".
+10. Never start two consecutive steps with the same word.
 
-Learner language for their solution: ${params.language === "cpp" ? "C++" : "Python"}.
+STYLE EXAMPLES (varied problems — use as style guide only, do not copy):
 
-Rules (must follow):
-- Produce exactly ${count} ordered steps (Step 1 → Step ${count}). Each step introduces only ONE new concept or action.
-- Do NOT give a full solution, pseudocode blocks, or a recipe that solves the whole problem.
-- Do NOT skip prerequisites; assume the learner may not know loops, variables, or I/O unless you already introduced them in an earlier step in this same list.
-- Steps must feel like progressive unlocks: reading the problem → thinking about inputs → storing data → core logic → output.
-- ${codeRule}
-- ${specificityGuide}
-- Use supportive, simple language suitable for beginners.
-- Avoid vague generic statements like "restate the problem". Give concrete learning nudges.
-- Prefer a mentor voice similar to: "Think about...", "What should happen when...", "You need...".
-- Do not mention all concepts in one step.
-
-Few-shot example for a vowel-count problem (style reference only, do not copy blindly):
+Example A — "Find max element in array" (9 steps):
 {"steps":[
-"C++ programs always start from a specific place. Think about where execution begins.",
-"The user needs clear guidance. How will your program ask for the sentence?",
-"You need a place to store text. Which data type can hold a sentence?",
-"A sentence may include spaces. Use an input method that reads a full line.",
-"Start a vowel counter variable from zero.",
-"Check characters one by one by repeating an action over the sentence.",
-"For each character, test whether it matches a vowel.",
-"If it matches, increase the counter.",
-"Print the final counter for the user."
+  "Every ${params.language === "cpp" ? "C++" : "Python"} program starts from one fixed entry point. Think about what that starting point looks like.",
+  "Your program needs to know how many numbers to read. Decide which variable will hold that count.",
+  "Read the count N from standard input into your variable.",
+  "You also need to read N numbers one by one. What kind of construct repeats an action exactly N times?",
+  "To track the largest number seen so far, you need a variable — what value should it start at?",
+  "For each number you read, compare it to your current largest. What condition causes an update?",
+  "Update your tracking variable whenever the new number beats the current record.",
+  "After all numbers are processed, you have the answer. Where does it go?",
+  "Print the final result in exactly the format the problem requires."
 ]}
 
-Bad example (never do this):
-{"steps":["Restate input and output","Write full algorithm","Print answer"]}
+Example B — "Check if string is palindrome" (9 steps):
+{"steps":[
+  "Read the input string into a variable.",
+  "A palindrome reads the same forwards and backwards — think about what two positions you would compare first.",
+  "Use two index variables: one starting at the left end, one at the right end.",
+  "Move both indices inward together, one step at a time, using a loop.",
+  "Inside the loop, compare the characters at the two positions.",
+  "If any pair of characters does not match, you already know the answer — act on it immediately.",
+  "If the loop completes without a mismatch, what does that tell you?",
+  "Store or print your yes/no result in the format the problem requires.",
+  "Test your logic with a single-character string — is it always a palindrome?"
+]}
 
-Return ONLY valid JSON (no markdown) in this shape:
+BAD example (never do this):
+{"steps":["Restate the problem","Write the algorithm","Handle edge cases","Print the answer"]}
+
+Return ONLY valid JSON with no markdown fences:
 {"steps":["...","..."]}`;
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
