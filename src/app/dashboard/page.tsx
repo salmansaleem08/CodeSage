@@ -13,14 +13,31 @@ type AttemptRow = {
   created_at: string;
 };
 
+function getBarColor(value: number, max: number, colorScheme: "default" | "accuracy" | "hints"): string {
+  if (value === 0) return "bg-muted";
+  if (colorScheme === "accuracy") {
+    if (value < 50) return "bg-amber-500/60";
+    if (value < 75) return "bg-primary/60";
+    return "bg-green-500/70";
+  }
+  const ratio = value / max;
+  if (ratio <= 0.33) return "bg-primary/30";
+  if (ratio <= 0.66) return "bg-primary/60";
+  return "bg-primary";
+}
+
 function ChartCard({
   title,
   subtitle,
-  values
+  values,
+  colorScheme = "default",
+  showDayDots = false
 }: {
   title: string;
   subtitle: string;
   values: Array<{ label: string; value: number }>;
+  colorScheme?: "default" | "accuracy" | "hints";
+  showDayDots?: boolean;
 }) {
   const max = Math.max(1, ...values.map((item) => item.value));
   return (
@@ -30,20 +47,30 @@ function ChartCard({
         <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
       </div>
       <div className="space-y-2.5">
-        {values.map((item) => (
-          <div key={item.label}>
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">{item.label}</span>
-              <span className="font-medium tabular-nums text-foreground">{item.value}</span>
+        {values.map((item) => {
+          const barColor = getBarColor(item.value, max, colorScheme);
+          return (
+            <div key={item.label}>
+              <div className="mb-1 flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  {showDayDots && (
+                    <span
+                      className={`inline-block size-1.5 rounded-full ${item.value > 0 ? "bg-primary" : "bg-muted-foreground/30"}`}
+                    />
+                  )}
+                  {item.label}
+                </span>
+                <span className="font-medium tabular-nums text-foreground">{item.value}</span>
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+                  style={{ width: `${(item.value / max) * 100}%` }}
+                />
+              </div>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <div
-                className="h-full rounded-full bg-primary/60 transition-all duration-500"
-                style={{ width: `${(item.value / max) * 100}%` }}
-              />
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </article>
   );
@@ -148,10 +175,10 @@ export default async function DashboardPage() {
   }
 
   const stats = [
-    { label: "Problems Solved", value: String(totalSolved), trend: `${totalSubmissions} total submissions`, icon: Target },
-    { label: "Current Streak", value: `${streak}d`, trend: "consecutive solved days", icon: Activity },
-    { label: "Accuracy Rate", value: `${accuracyRate}%`, trend: "correct / submitted", icon: TrendingUp },
-    { label: "Avg Attempts", value: avgAttempts.toFixed(1), trend: "per problem", icon: Brain }
+    { label: "Problems Solved", value: String(totalSolved), trend: `${totalSubmissions} total submissions`, icon: Target, borderClass: "border-b-green-500" },
+    { label: "Current Streak", value: `${streak}d`, trend: "consecutive solved days", icon: Activity, borderClass: "border-b-amber-500" },
+    { label: "Accuracy Rate", value: `${accuracyRate}%`, trend: "correct / submitted", icon: TrendingUp, borderClass: "border-b-primary" },
+    { label: "Avg Attempts", value: avgAttempts.toFixed(1), trend: "per problem", icon: Brain, borderClass: "border-b-purple-500" }
   ];
 
   return (
@@ -169,7 +196,7 @@ export default async function DashboardPage() {
           {stats.map((item) => {
             const Icon = item.icon;
             return (
-              <article key={item.label} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <article key={item.label} className={`rounded-xl border border-border border-b-2 ${item.borderClass} bg-card p-5 shadow-sm`}>
                 <div className="mb-3 flex items-start justify-between">
                   <Icon className="size-4 text-muted-foreground/50" />
                   <span className="text-[11px] text-muted-foreground">{item.trend}</span>
@@ -187,21 +214,26 @@ export default async function DashboardPage() {
             title="Solving Activity"
             subtitle="Daily solved count — last 7 days"
             values={dailyProblemCounts}
+            colorScheme="default"
+            showDayDots={true}
           />
           <ChartCard
             title="Accuracy Trend"
             subtitle="Daily correctness % — last 7 days"
             values={accuracyTrend}
+            colorScheme="accuracy"
           />
           <ChartCard
             title="Topic Distribution"
             subtitle="Problem attempts by topic"
             values={topicDistribution}
+            colorScheme="default"
           />
           <ChartCard
             title="Hint Usage"
             subtitle="Hints used in your latest attempts"
             values={hintUsage.length > 0 ? hintUsage : topics.map((t) => ({ label: t, value: 0 }))}
+            colorScheme="hints"
           />
         </section>
 
@@ -209,11 +241,11 @@ export default async function DashboardPage() {
         <section>
           <article className="rounded-xl border border-border bg-card p-6 shadow-sm">
             <h2 className="mb-4 text-sm font-semibold">Learning Insights</h2>
-            <ul className="divide-y divide-border">
+            <ul className="space-y-2">
               {insights.map((insight) => (
                 <li
                   key={insight}
-                  className="py-3 text-sm leading-relaxed text-muted-foreground first:pt-0 last:pb-0"
+                  className="border-l-2 border-primary/40 pl-3 py-2 bg-card rounded-r-lg text-sm leading-relaxed text-muted-foreground"
                 >
                   {insight}
                 </li>

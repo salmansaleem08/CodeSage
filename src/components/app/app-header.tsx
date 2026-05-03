@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import { UserCircle2 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/app/theme-toggle";
@@ -37,8 +38,9 @@ export async function AppHeader() {
         {/* Brand */}
         <Link
           href="/dashboard"
-          className="text-base font-semibold text-foreground transition-opacity hover:opacity-70"
+          className="flex items-center gap-2 text-base font-semibold text-foreground transition-opacity hover:opacity-70"
         >
+          <Image src="/logo.png" alt="CodeSage" width={24} height={24} className="rounded-sm" />
           CodeSage
         </Link>
 

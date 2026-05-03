@@ -127,35 +127,70 @@ export default async function SettingsPage() {
     };
   });
 
+  const statsConfig = [
+    {
+      label: "Problems Solved",
+      value: String(totalSolved),
+      icon: Trophy,
+      iconClass: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+    },
+    {
+      label: "Accuracy Rate",
+      value: `${correctRate}%`,
+      icon: Target,
+      iconClass: "bg-green-500/10 text-green-600 dark:text-green-400"
+    },
+    {
+      label: "Hints Used",
+      value: String(hints),
+      icon: Lightbulb,
+      iconClass: "bg-blue-500/10 text-blue-600 dark:text-blue-400"
+    },
+    {
+      label: "Total Attempts",
+      value: String(totalAttempts),
+      icon: BarChart3,
+      iconClass: "bg-purple-500/10 text-purple-600 dark:text-purple-400"
+    }
+  ];
+
   return (
     <main className="min-h-screen bg-background text-foreground">
       <AppHeader />
       <section className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 sm:px-6 md:px-10">
         <div>
-          <h1 className="text-xl font-semibold">Settings</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Manage your profile, preferences, and connections.</p>
+          <h1 className="text-2xl font-bold bg-gradient-to-r from-primary to-[oklch(0.52_0.22_300)] bg-clip-text text-transparent">
+            Settings
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage your profile, learning preferences, and connections.
+          </p>
         </div>
 
         <ProfileSettingsForm userId={user.id} initialProfile={profile} />
 
         {/* Stats summary */}
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {[
-            { label: "Problems Solved", value: String(totalSolved), icon: Trophy },
-            { label: "Accuracy Rate", value: `${correctRate}%`, icon: Target },
-            { label: "Hints Used", value: String(hints), icon: Lightbulb },
-            { label: "Total Attempts", value: String(totalAttempts), icon: BarChart3 }
-          ].map((metric) => {
-            const Icon = metric.icon;
-            return (
-              <article key={metric.label} className="rounded-xl border border-border bg-card p-6">
-                <Icon className="mb-3 size-4 text-muted-foreground/50" />
-                <p className="text-3xl font-bold tracking-tight tabular-nums">{metric.value}</p>
-                <p className="mt-1 text-xs text-muted-foreground">{metric.label}</p>
-              </article>
-            );
-          })}
-        </section>
+        <div>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Your Statistics</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {statsConfig.map((metric) => {
+              const Icon = metric.icon;
+              return (
+                <article key={metric.label} className="rounded-xl border border-border bg-card p-5 shadow-sm">
+                  <div className={`inline-flex rounded-lg p-2 mb-3 ${metric.iconClass}`}>
+                    <Icon className="size-4" />
+                  </div>
+                  <p className="text-2xl font-bold tracking-tight tabular-nums">{metric.value}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{metric.label}</p>
+                </article>
+              );
+            })}
+          </section>
+        </div>
 
         <FriendNetwork currentUserId={user.id} friends={publicProfilesWithStats} incomingRequests={requestView} />
       </section>

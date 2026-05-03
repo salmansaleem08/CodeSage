@@ -762,13 +762,19 @@ export function CodeWorkspace() {
     <div className="flex flex-1 flex-col overflow-hidden">
 
       {/* ── Guidance bar ── */}
-      <div className="shrink-0 border-b border-border bg-background/95 px-4 py-2">
+      <div className="shrink-0 border-b border-border bg-gradient-to-r from-background via-card to-background px-4 py-2">
         <div className="flex flex-wrap items-center gap-2">
           {/* Mode toggle — compact pill */}
           <div className="inline-flex items-center gap-px rounded-full border border-border bg-muted p-0.5">
             {MODE_CARDS.map((card) => {
               const Icon = card.icon;
               const selected = mode === card.id;
+              const selectedClass =
+                card.id === "SEED"
+                  ? "bg-green-500/15 text-green-700 dark:text-green-400 border border-green-500/30"
+                  : card.id === "FOCUS"
+                  ? "bg-primary/15 text-primary border border-primary/30"
+                  : "bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/30";
               return (
                 <button
                   key={card.id}
@@ -778,7 +784,7 @@ export function CodeWorkspace() {
                   className={cn(
                     "flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-all",
                     selected
-                      ? "bg-primary/10 text-primary"
+                      ? selectedClass
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -882,7 +888,7 @@ export function CodeWorkspace() {
 
         {/* ── LEFT: Problem panel (280px) ── */}
         <div className="flex w-[280px] shrink-0 flex-col overflow-hidden border-r border-border bg-background">
-          <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
+          <div className="flex shrink-0 items-center justify-between border-b border-border bg-gradient-to-b from-card to-card/80 px-3 py-2">
             <h2 className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
               Problem
             </h2>
@@ -1069,7 +1075,7 @@ export function CodeWorkspace() {
         {/* ── CENTER: Editor panel ── */}
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           {/* Toolbar */}
-          <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-border bg-background px-3">
+          <div className="flex h-10 shrink-0 items-center gap-1.5 border-b border-border bg-gradient-to-b from-card to-card/80 px-3">
             {/* Language toggle — left */}
             <div className="inline-flex items-center gap-px rounded-md border border-border/60 bg-transparent p-0.5">
               <Button
@@ -1108,7 +1114,7 @@ export function CodeWorkspace() {
             <div className="ml-auto flex items-center gap-1.5">
               <Button
                 variant="ghost"
-                className="h-7 gap-1.5 px-3 text-xs"
+                className="h-7 gap-1.5 px-3 text-xs bg-primary/10 hover:bg-primary/20 text-primary border border-primary/20"
                 onClick={requestHint}
                 disabled={mode === "SEED" && seedLoading}
               >
@@ -1126,7 +1132,7 @@ export function CodeWorkspace() {
               </Button>
               <Button
                 variant="default"
-                className="h-7 px-4 text-xs"
+                className="h-7 px-4 text-xs bg-gradient-to-r from-primary to-[oklch(0.52_0.22_300)] text-primary-foreground hover:opacity-90 border-0"
                 onClick={handleSubmit}
                 disabled={running}
               >
@@ -1184,7 +1190,7 @@ export function CodeWorkspace() {
         {/* ── RIGHT: Console panel (320px) ── */}
         <div className="flex w-[320px] shrink-0 flex-col overflow-hidden border-l border-border bg-background">
           {/* Tab header */}
-          <div className="flex shrink-0 items-center gap-1 border-b border-border px-2 py-1.5">
+          <div className="flex shrink-0 items-center gap-1 border-b border-border bg-gradient-to-b from-card to-card/80 px-2 py-1.5">
             <button
               type="button"
               onClick={() => setConsoleTab("console")}
@@ -1416,7 +1422,7 @@ function ConsoleBlock({
       </p>
       <pre
         className={cn(
-          "rounded-md bg-[#0a0a0a] dark:bg-[#0a0a0a] p-2 font-mono text-[11px] leading-relaxed whitespace-pre-wrap break-all text-[#e8e8e8]",
+          "rounded-md bg-[oklch(0.10_0.010_255)] dark:bg-[oklch(0.10_0.010_255)] p-2 font-mono text-sm leading-relaxed whitespace-pre-wrap break-all text-[#e8e8e8]",
           minHeight
         )}
       >

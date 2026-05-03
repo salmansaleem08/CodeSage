@@ -183,15 +183,15 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
               <img
                 src={avatarUrl}
                 alt="Profile avatar"
-                className="size-20 rounded-full border border-border object-cover transition-opacity group-hover:opacity-80"
+                className="size-20 rounded-full border-2 border-primary/20 object-cover shadow-md transition-opacity group-hover:opacity-75"
               />
             ) : (
-              <div className="grid size-20 place-content-center rounded-full border border-border bg-muted transition-colors group-hover:bg-accent">
-                <UserCircle2 className="size-9 text-muted-foreground" />
+              <div className="grid size-20 place-content-center rounded-full border-2 border-dashed border-primary/20 bg-primary/5 transition-colors group-hover:border-primary/40 group-hover:bg-primary/10">
+                <UserCircle2 className="size-9 text-primary/40" />
               </div>
             )}
-            <span className="absolute -right-1 -bottom-1 rounded-full border border-border bg-card px-2 py-0.5 text-[10px] font-semibold shadow-xs">
-              Edit
+            <span className="absolute -right-1 -bottom-1 flex items-center justify-center size-6 rounded-full border-2 border-background bg-primary text-[10px] font-bold text-primary-foreground shadow-md">
+              ✎
             </span>
           </label>
           <div className="space-y-1">
@@ -210,8 +210,15 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
 
       {/* Personal settings form */}
       <form onSubmit={handleSaveProfile} className="rounded-xl border border-border bg-card p-6">
-        <h2 className="mb-1 text-base font-semibold">Personal Settings</h2>
+        <div className="flex items-center gap-2.5 mb-1">
+          <div className="rounded-lg p-1.5 bg-primary/10">
+            <UserCircle2 className="size-4 text-primary" />
+          </div>
+          <h2 className="text-base font-semibold">Personal Settings</h2>
+        </div>
         <p className="mb-5 text-sm text-muted-foreground">Manage your profile and learning preferences.</p>
+
+        {/* Profile info group */}
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="full-name">Full Name</Label>
@@ -229,6 +236,16 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
             <Label htmlFor="interests">Current Interests (comma separated)</Label>
             <Input id="interests" value={interests} onChange={(e) => setInterests(e.target.value)} className="h-11" />
           </div>
+        </div>
+
+        {/* Section separator */}
+        <div className="my-5 flex items-center gap-3">
+          <div className="h-px flex-1 bg-border" />
+          <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">Learning Preferences</span>
+          <div className="h-px flex-1 bg-border" />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="mode">Default Mode</Label>
             <select
@@ -241,6 +258,13 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
               <option value="FOCUS">FOCUS</option>
               <option value="SHADOW">SHADOW</option>
             </select>
+            <p className="text-xs text-muted-foreground mt-1">
+              {defaultMode === "SEED"
+                ? "SEED: Structured step-by-step guidance"
+                : defaultMode === "FOCUS"
+                ? "FOCUS: Logic mentoring"
+                : "SHADOW: Minimal nudges only"}
+            </p>
           </div>
           <div className="space-y-2">
             <Label htmlFor="hint-level">Default Hint Level</Label>
@@ -272,7 +296,13 @@ export function ProfileSettingsForm({ userId, initialProfile }: ProfileSettingsF
       {/* Quick Friend Request */}
       <form onSubmit={handleAddFriend} className="rounded-xl border border-border bg-card p-6">
         <h2 className="mb-1 text-base font-semibold">Quick Friend Request</h2>
-        <p className="mb-5 text-sm text-muted-foreground">Enter a classmate&apos;s email to send them a friend request.</p>
+        <p className="mb-3 text-sm text-muted-foreground">Enter a classmate&apos;s email to send them a friend request.</p>
+        <div className="mb-4 flex items-start gap-2.5 rounded-lg bg-primary/5 border border-primary/10 px-3 py-2.5">
+          <CheckCircle2 className="mt-0.5 size-3.5 shrink-0 text-primary" />
+          <p className="text-xs text-muted-foreground leading-relaxed">
+            Your classmate will receive a pending request. Once they accept, you can both see each other&apos;s progress on the leaderboard.
+          </p>
+        </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
           <div className="flex-1 space-y-2">
             <Label htmlFor="friend-email">Friend email</Label>
