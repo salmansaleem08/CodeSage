@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { requireEditorAccess } from "@/lib/auth/require-editor-access";
 import { buildSeedFallbackSteps, generateSeedStepsWithGemini, GeminiConfigError, GeminiResponseError } from "@/lib/gemini/generate-seed-steps";
 import { fingerprintProblem, settingsKey } from "@/lib/guidance/problem-fingerprint";
-import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -24,17 +24,12 @@ function normalizeSteps(raw: unknown): string[] {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
+  const access = await requireEditorAccess();
+  if (!access.ok) return access.response;
+  const { supabase, user } = access;
   const seed = () =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- table typing with SSR client schema variance
     (supabase as any).from("seed_guidance_sessions");
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
 
   let body: BootstrapBody;
   try {

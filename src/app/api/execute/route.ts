@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { requireEditorAccess } from "@/lib/auth/require-editor-access";
+
 const WANDBOX_ENDPOINT = "https://wandbox.org/api/compile.json";
 
 type ExecuteRequestBody = {
@@ -16,6 +18,9 @@ function getRuntime(language: ExecuteRequestBody["language"]) {
 }
 
 export async function POST(request: Request) {
+  const access = await requireEditorAccess();
+  if (!access.ok) return access.response;
+
   try {
     const body = (await request.json()) as ExecuteRequestBody;
     if (!body?.code?.trim()) {

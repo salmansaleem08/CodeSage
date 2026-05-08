@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
+import { requireEditorAccess } from "@/lib/auth/require-editor-access";
 import { GeminiConfigError, GeminiResponseError } from "@/lib/gemini/generate-seed-steps";
 import { parseProblemTextWithGemini } from "@/lib/gemini/parse-problem-text";
-import { createClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -14,14 +14,8 @@ type ParseBody = {
 const MAX_TEXT_LENGTH = 24_000;
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
+  const access = await requireEditorAccess();
+  if (!access.ok) return access.response;
 
   let body: ParseBody;
   try {

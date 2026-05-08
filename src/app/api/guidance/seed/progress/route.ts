@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireEditorAccess } from "@/lib/auth/require-editor-access";
 
 export const runtime = "nodejs";
 
@@ -17,17 +17,12 @@ function normalizeSteps(raw: unknown): string[] {
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
+  const access = await requireEditorAccess();
+  if (!access.ok) return access.response;
+  const { supabase, user } = access;
   const seed = () =>
     // eslint-disable-next-line @typescript-eslint/no-explicit-any -- table typing with SSR client schema variance
     (supabase as any).from("seed_guidance_sessions");
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-  }
 
   let body: ProgressBody;
   try {

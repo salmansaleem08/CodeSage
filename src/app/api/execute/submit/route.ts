@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { createClient } from "@/lib/supabase/server";
+import { requireEditorAccess } from "@/lib/auth/require-editor-access";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -71,11 +71,8 @@ async function runOne(
 }
 
 export async function POST(request: Request) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+  const access = await requireEditorAccess();
+  if (!access.ok) return access.response;
 
   let body: { language?: string; code?: string; testCases?: TestCaseInput[] };
   try {

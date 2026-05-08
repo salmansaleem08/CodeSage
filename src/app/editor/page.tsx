@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/app/app-header";
+import { EditorAccessGate } from "@/components/app/editor-access-gate";
 import { CodeWorkspace } from "@/features/workspace/components/code-workspace";
+import { isEditorAllowed } from "@/lib/auth/allowlist";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function EditorPage() {
@@ -13,6 +15,15 @@ export default async function EditorPage() {
 
   if (!user) {
     redirect("/login");
+  }
+
+  if (!isEditorAllowed(user.email)) {
+    return (
+      <main className="flex min-h-dvh flex-col bg-background text-foreground">
+        <AppHeader />
+        <EditorAccessGate email={user.email} />
+      </main>
+    );
   }
 
   return (
