@@ -16,7 +16,7 @@ async function signOutAction() {
 
   const supabase = await createClient();
   await supabase.auth.signOut();
-  redirect("/login");
+  redirect("/");
 }
 
 export async function AppHeader() {
@@ -40,7 +40,7 @@ export async function AppHeader() {
           href="/dashboard"
           className="flex items-center gap-2 text-base font-semibold text-foreground transition-opacity hover:opacity-70"
         >
-          <Image src="/logo.png" alt="CodeSage" width={24} height={24} className="rounded-sm" />
+          <Image src="/code.png" alt="CodeSage" width={24} height={24} className="rounded-sm" />
           CodeSage
         </Link>
 
