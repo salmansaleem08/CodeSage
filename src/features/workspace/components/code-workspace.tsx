@@ -37,16 +37,16 @@ import { registerSeedInlineHintProvider, triggerInlineSuggest } from "@/features
 
 // Pure-idle fallback: if the user types nothing at all for this long after
 // accepting a step, the next hint is surfaced anyway so they're never stuck.
-const SEED_IDLE_MS = 90_000;
+const SEED_IDLE_MS = 75_000;
 // Once the user has typed enough code for the accepted step, we wait for
 // THIS long of typing inactivity before unlocking the next hint. Each new
 // keystroke resets the timer, so the next ghost step only appears when the
 // learner has clearly paused — i.e. is "done" with the previous thing.
-const SEED_PAUSE_MS = 22_500;
+const SEED_PAUSE_MS = 15_000;
 const MAX_PROBLEM_TEXT_FILE_BYTES = 120_000;
 // Minimum non-whitespace characters of new code required before we even
 // consider that the learner has started addressing the accepted step.
-const MIN_NONWS_CHARS_AFTER_ACCEPT = 14;
+const MIN_NONWS_CHARS_AFTER_ACCEPT = 12;
 
 type Language = "cpp" | "python";
 type Mode = "SEED" | "FOCUS" | "SHADOW";
@@ -521,6 +521,25 @@ export function CodeWorkspace() {
           }
         }
         armIdleRef.current();
+      });
+
+      // Shift+Tab anywhere in the editor surfaces the next SEED hint
+      // immediately — useful when the learner is stuck and wants the next
+      // step without waiting for the typing-pause timer.
+      editor.onKeyDown((e) => {
+        if (modeRef.current !== "SEED") return;
+        if (!e.shiftKey || e.keyCode !== monaco.KeyCode.Tab) return;
+        const bundle = seedBundleRef.current;
+        if (!bundle.steps.length || bundle.frontier > bundle.steps.length) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if (typingTimerRef.current) {
+          clearTimeout(typingTimerRef.current);
+          typingTimerRef.current = null;
+        }
+        requiresUserInputRef.current = false;
+        setWaitingForCode(false);
+        triggerInlineSuggest(editor);
       });
     },
     [armPostTypingRelease]
@@ -1127,9 +1146,15 @@ export function CodeWorkspace() {
               </span>
             )}
             {mode === "SEED" && waitingForCode && seedSteps.length > 0 && (
-              <span className="flex items-center gap-1.5 rounded border border-primary/20 bg-primary/8 px-2 py-0.5 text-[11px] text-primary">
+              <span
+                title="Stuck? Press Shift+Tab to reveal the next step now."
+                className="flex items-center gap-1.5 rounded border border-primary/20 bg-primary/8 px-2 py-0.5 text-[11px] text-primary"
+              >
                 <Keyboard className="size-3" />
-                Code step {Math.max(seedFrontier - 1, 1)}, then step {Math.min(seedFrontier, seedSteps.length)} appears
+                Code step {Math.max(seedFrontier - 1, 1)} — next appears when you pause, or press
+                <kbd className="rounded border border-primary/30 bg-background/60 px-1 py-px font-mono text-[10px] tracking-tight text-primary">
+                  Shift+Tab
+                </kbd>
               </span>
             )}
 
