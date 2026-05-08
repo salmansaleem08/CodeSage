@@ -36,7 +36,10 @@ import { formatSeedHintComment } from "@/features/workspace/lib/seed-hint-format
 import { registerSeedInlineHintProvider, triggerInlineSuggest } from "@/features/workspace/monaco/register-seed-inline";
 
 const SEED_IDLE_MS = 45_000;
-const SEED_PAUSE_MS = 1_800;
+// After the user accepts a SEED step and finishes typing the code for it, wait
+// this long before nudging the next hint into the gutter — gives the learner
+// real thinking time instead of the next step popping the moment they pause.
+const SEED_PAUSE_MS = 7_500;
 const MAX_PROBLEM_TEXT_FILE_BYTES = 120_000;
 const MIN_NONWS_CHARS_AFTER_ACCEPT = 5;
 
