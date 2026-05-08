@@ -80,7 +80,11 @@ export async function AppHeader() {
           )}
 
           <form action={signOutAction}>
-            <Button variant="ghost" className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground">
+            <Button
+              type="submit"
+              variant="ghost"
+              className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+            >
               Logout
             </Button>
           </form>
