@@ -23,7 +23,7 @@ export default async function Home() {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 md:px-10">
           {/* Brand */}
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.png" alt="CodeSage" width={28} height={28} className="rounded-sm" />
+            <Image src="/code.png" alt="CodeSage" width={28} height={28} className="rounded-sm" />
             <span className="text-sm font-semibold tracking-wide text-foreground">CodeSage</span>
           </Link>
 

@@ -23,7 +23,7 @@ export default async function LoginPage() {
         <div className="mx-auto max-w-sm space-y-8">
           {/* Logo + name */}
           <div className="flex flex-col items-center gap-3 text-center">
-            <Image src="/logo.png" alt="CodeSage" width={48} height={48} className="rounded-md" />
+            <Image src="/code.png" alt="CodeSage" width={48} height={48} className="rounded-md" />
             <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-primary to-[oklch(0.52_0.22_300)] bg-clip-text text-transparent">
               CodeSage
             </h1>
@@ -60,7 +60,7 @@ export default async function LoginPage() {
         <div className="w-full max-w-sm space-y-8">
           {/* Logo + name (visible on mobile too) */}
           <div className="flex flex-col items-center gap-2 text-center">
-            <Image src="/logo.png" alt="CodeSage" width={32} height={32} className="rounded-sm" />
+            <Image src="/code.png" alt="CodeSage" width={32} height={32} className="rounded-sm" />
             <span className="text-sm font-semibold text-foreground">CodeSage</span>
           </div>
 
