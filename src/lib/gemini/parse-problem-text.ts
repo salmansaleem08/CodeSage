@@ -38,6 +38,57 @@ function looksLikeVowelProblem(source: string): boolean {
   return /count\s+vowel|vowel/i.test(source);
 }
 
+const STOPWORDS = new Set([
+  "the", "a", "an", "and", "or", "of", "to", "for", "in", "on", "at", "by", "with",
+  "is", "are", "be", "this", "that", "these", "those", "it", "its", "as", "from",
+  "you", "your", "we", "our", "given", "find", "write", "program", "code", "solve",
+  "such", "any", "all", "each", "into", "out", "if", "else", "then", "than",
+  "input", "output", "constraints", "examples", "example", "sample", "test", "case",
+  "should", "must", "may", "can", "will", "do", "does", "would", "have", "has",
+  "use", "using", "uses", "which", "what", "where", "when", "while", "after",
+  "before", "between", "without", "via"
+]);
+
+function titleCase(words: string[]): string {
+  return words
+    .map((word) => (word.length <= 2 ? word.toUpperCase() : word[0].toUpperCase() + word.slice(1).toLowerCase()))
+    .join(" ");
+}
+
+function deriveTitleFromText(rawText: string): string {
+  const compact = rawText.replace(/\s+/g, " ").trim();
+  if (!compact) return "";
+  const tokens = compact
+    .replace(/[^a-zA-Z0-9 ]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  const counts = new Map<string, number>();
+  for (const token of tokens) {
+    const lower = token.toLowerCase();
+    if (lower.length < 3) continue;
+    if (STOPWORDS.has(lower)) continue;
+    if (/^\d+$/.test(lower)) continue;
+    counts.set(lower, (counts.get(lower) ?? 0) + 1);
+  }
+  const top = Array.from(counts.entries())
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 4)
+    .map(([word]) => word);
+  if (top.length === 0) return "";
+  return titleCase(top);
+}
+
+function looksLikeProseSentence(value: string): boolean {
+  const s = value.trim();
+  if (!s) return true;
+  if (s.length > 80) return true;
+  // ends with sentence punctuation, or contains multiple sentences
+  if (/[.!?](\s|$)/.test(s) && !/^[A-Z][\w-]*\s?[\w-]*$/.test(s)) return true;
+  // looks like an instruction line
+  if (/^(write|given|find|return|print|read|compute|implement|you\s+are|count\s+the|determine)\b/i.test(s)) return true;
+  return false;
+}
+
 function finalizeProblem(rawText: string, parsed: ParsedProblem): ParsedProblem {
   const compact = rawText.replace(/\s+/g, " ").trim();
   const firstLine = rawText
@@ -45,9 +96,17 @@ function finalizeProblem(rawText: string, parsed: ParsedProblem): ParsedProblem 
     .map((line) => line.trim())
     .find(Boolean);
 
+  const candidateTitleFromFirstLine =
+    firstLine && firstLine.length <= 80 && !looksLikeProseSentence(firstLine) ? firstLine : "";
+
+  const parsedTitleClean = parsed.title && !looksLikeProseSentence(parsed.title) ? parsed.title : "";
+
+  const derived = deriveTitleFromText(rawText);
+
   const generatedTitle =
-    parsed.title ||
-    (firstLine && firstLine.length <= 80 ? firstLine : "") ||
+    parsedTitleClean ||
+    candidateTitleFromFirstLine ||
+    derived ||
     "Generated Practice Problem";
 
   const generatedDescription =
@@ -178,7 +237,8 @@ JSON shape:
 {"title":"","description":"","constraints":"","inputOutputFormat":"","examples":""}
 
 Important:
-- If title is missing, create a concise and meaningful one.
+- The title field MUST always be a concise 2-6 word Title Case phrase (e.g. "Count Vowels", "Maximum Subarray Sum"). Never use a full sentence, never end it with punctuation, and never copy a prose instruction line as the title.
+- If the source text has no explicit title, INVENT a meaningful 2-6 word title from the dominant nouns/verbs of the problem.
 - If description is weak/missing, write a clear problem description from available context.
 - If constraints/inputOutputFormat/examples are absent, generate practical defaults consistent with the problem.
 - Never leave any field empty.`;
