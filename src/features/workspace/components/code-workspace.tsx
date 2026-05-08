@@ -35,13 +35,18 @@ import { settingsKey as composeSeedSettingsKey } from "@/lib/guidance/problem-fi
 import { formatSeedHintComment } from "@/features/workspace/lib/seed-hint-format";
 import { registerSeedInlineHintProvider, triggerInlineSuggest } from "@/features/workspace/monaco/register-seed-inline";
 
-const SEED_IDLE_MS = 45_000;
-// After the user accepts a SEED step and finishes typing the code for it, wait
-// this long before nudging the next hint into the gutter — gives the learner
-// real thinking time instead of the next step popping the moment they pause.
+// Pure-idle fallback: if the user types nothing at all for this long after
+// accepting a step, the next hint is surfaced anyway so they're never stuck.
+const SEED_IDLE_MS = 90_000;
+// Once the user has typed enough code for the accepted step, we wait for
+// THIS long of typing inactivity before unlocking the next hint. Each new
+// keystroke resets the timer, so the next ghost step only appears when the
+// learner has clearly paused — i.e. is "done" with the previous thing.
 const SEED_PAUSE_MS = 22_500;
 const MAX_PROBLEM_TEXT_FILE_BYTES = 120_000;
-const MIN_NONWS_CHARS_AFTER_ACCEPT = 5;
+// Minimum non-whitespace characters of new code required before we even
+// consider that the learner has started addressing the accepted step.
+const MIN_NONWS_CHARS_AFTER_ACCEPT = 14;
 
 type Language = "cpp" | "python";
 type Mode = "SEED" | "FOCUS" | "SHADOW";
@@ -266,18 +271,25 @@ export function CodeWorkspace() {
     }, SEED_IDLE_MS);
   }, []);
 
-  const armTypingPauseHint = useCallback(() => {
+  // Arm the post-typing pause that releases the NEXT hint once the learner
+  // has clearly stopped typing for SEED_PAUSE_MS. Each new keystroke calls
+  // this to reset the countdown; only when the user truly pauses does the
+  // gate (`requiresUserInputRef`) drop and the inline suggestion appear.
+  const armPostTypingRelease = useCallback(() => {
     if (typingTimerRef.current) {
       clearTimeout(typingTimerRef.current);
       typingTimerRef.current = null;
     }
     if (modeRef.current !== "SEED" || hintDeliveryRef.current !== "automatic") return;
     if (!seedStepsRef.current.length) return;
+    if (!requiresUserInputRef.current) return;
 
     typingTimerRef.current = setTimeout(() => {
       typingTimerRef.current = null;
       if (modeRef.current !== "SEED" || hintDeliveryRef.current !== "automatic") return;
-      if (requiresUserInputRef.current) return; // still waiting — don't show yet
+      if (!requiresUserInputRef.current) return;
+      requiresUserInputRef.current = false;
+      setWaitingForCode(false);
       const ed = editorRef.current;
       if (ed) triggerInlineSuggest(ed);
     }, SEED_PAUSE_MS);
@@ -491,32 +503,27 @@ export function CodeWorkspace() {
       );
 
       editor.onDidChangeModelContent(() => {
+        // Only fire ANY automatic-hint logic while the learner is still
+        // working through an accepted SEED step. Once they're past the
+        // gate, Monaco's inlineSuggest naturally surfaces the next hint
+        // through the registered provider — no extra timers needed.
         if (requiresUserInputRef.current) {
           const nonws = editor.getValue().replace(/\s/g, "").length;
           const delta = nonws - codeAtAcceptNonwsRef.current;
           if (delta >= MIN_NONWS_CHARS_AFTER_ACCEPT) {
-            requiresUserInputRef.current = false;
-            setWaitingForCode(false);
-            armTypingPauseHint();
+            // Learner has written enough code; arm/refresh the pause-after-
+            // typing release so the next hint only surfaces once they stop.
+            armPostTypingRelease();
+          } else if (typingTimerRef.current) {
+            // Below threshold again (deletion) — cancel any pending release.
+            clearTimeout(typingTimerRef.current);
+            typingTimerRef.current = null;
           }
-          armIdleRef.current();
-          return;
         }
-        armTypingPauseHint();
         armIdleRef.current();
       });
-
-      editor.onDidChangeCursorPosition(() => {
-        if (
-          modeRef.current === "SEED" &&
-          hintDeliveryRef.current === "automatic" &&
-          !requiresUserInputRef.current
-        ) {
-          armTypingPauseHint();
-        }
-      });
     },
-    [armTypingPauseHint]
+    [armPostTypingRelease]
   );
 
   function switchLanguage(next: Language) {
