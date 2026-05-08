@@ -60,6 +60,8 @@ type TestCase = {
   expectedOutput: string;
 };
 
+type MatchStrategy = "exact" | "tail" | "stripped-prompts" | "tokens";
+
 type TestCaseResult = {
   index: number;
   input: string;
@@ -69,6 +71,7 @@ type TestCaseResult = {
   exitCode: number;
   stderr: string;
   compileError: string;
+  matchStrategy?: MatchStrategy;
 };
 
 type SubmitSummary = {
@@ -1027,6 +1030,16 @@ export function CodeWorkspace() {
                 </div>
               </div>
 
+              {testCases.length === 0 && (
+                <p className="rounded-md border border-border/60 bg-muted/30 px-2.5 py-2 text-[10.5px] leading-relaxed text-muted-foreground">
+                  Tip: your code reads from stdin and prints to stdout via{" "}
+                  <code className="rounded bg-background px-1 py-px font-mono text-[10px]">main</code>. We
+                  match the program output against the expected text. If you print prompts
+                  like <code className="rounded bg-background px-1 py-px font-mono text-[10px]">cout &lt;&lt; &quot;Enter n: &quot;</code>, those lines are
+                  ignored automatically — but for cleanest results, comment them out before submitting.
+                </p>
+              )}
+
               {testCaseError && (
                 <p className="text-[11px] text-destructive">{testCaseError}</p>
               )}
@@ -1361,6 +1374,14 @@ export function CodeWorkspace() {
                       <XCircle className="size-3.5 text-destructive" />
                     )}
                     <span className="font-medium">Test {r.index + 1}</span>
+                    {r.passed && r.matchStrategy && r.matchStrategy !== "exact" && (
+                      <span
+                        title='Matched after ignoring prompt-like lines (e.g. cout << "Enter n: "). For exact matches, comment those lines out.'
+                        className="rounded-full border border-amber-500/30 bg-amber-500/10 px-1.5 py-px text-[9.5px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400"
+                      >
+                        prompts ignored
+                      </span>
+                    )}
                     <span
                       className={cn(
                         "ml-auto text-[10px] font-bold tracking-wide",

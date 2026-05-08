@@ -15,6 +15,8 @@ type TestCaseInput = {
   expectedOutput: string;
 };
 
+type MatchStrategy = "exact" | "tail" | "stripped-prompts" | "tokens";
+
 type TestCaseResult = {
   index: number;
   input: string;
@@ -24,6 +26,7 @@ type TestCaseResult = {
   exitCode: number;
   stderr: string;
   compileError: string;
+  matchStrategy?: MatchStrategy;
 };
 
 function getRuntime(language: Language) {
@@ -31,15 +34,68 @@ function getRuntime(language: Language) {
   return { compiler: "cpython-3.10.15", options: "" };
 }
 
-function normalizeOutput(s: string): string {
+function toLines(s: string): string[] {
   const lines = s.replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-  // Trim each line individually (handles trailing spaces on lines)
-  const trimmedLines = lines.map((line) => line.trim());
-  // Remove trailing empty lines
-  while (trimmedLines.length > 0 && trimmedLines[trimmedLines.length - 1] === "") {
-    trimmedLines.pop();
+  const trimmed = lines.map((line) => line.trim());
+  while (trimmed.length > 0 && trimmed[trimmed.length - 1] === "") trimmed.pop();
+  return trimmed;
+}
+
+function normalizeOutput(s: string): string {
+  return toLines(s).join("\n");
+}
+
+// A line that looks like an interactive prompt rather than program output.
+// Programs often write prompts via cout/print: "Enter number:", "Type your name?",
+// "Please input two integers:". These prompts are noise when grading.
+function looksLikePromptLine(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  if (/[?:]$/.test(trimmed)) return true;
+  if (/\b(enter|input|please|kindly|type|prompt|provide|give\s+(?:me|the)|ask\s+(?:for|the))\b/i.test(trimmed)) {
+    return true;
   }
-  return trimmedLines.join("\n");
+  return false;
+}
+
+function stripPromptLines(lines: string[]): string[] {
+  return lines.filter((line) => !looksLikePromptLine(line));
+}
+
+function tokenize(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+// Compare actual program output against expected with progressively-lenient
+// strategies so user code that prints prompts (e.g. cout << "Enter n: ") still
+// grades correctly when its actual answer matches.
+function compareOutputs(actualRaw: string, expectedRaw: string): {
+  passed: boolean;
+  matchStrategy?: MatchStrategy;
+} {
+  const actual = toLines(actualRaw);
+  const expected = toLines(expectedRaw);
+  const expectedJoined = expected.join("\n");
+  const actualJoined = actual.join("\n");
+
+  if (actualJoined === expectedJoined) return { passed: true, matchStrategy: "exact" };
+
+  // Tail match — many beginner programs print a prompt or two, then the answer.
+  if (expected.length > 0 && actual.length >= expected.length) {
+    const tail = actual.slice(actual.length - expected.length).join("\n");
+    if (tail === expectedJoined) return { passed: true, matchStrategy: "tail" };
+  }
+
+  // Strip prompt-ish lines from actual, then compare line-by-line.
+  const stripped = stripPromptLines(actual).join("\n");
+  if (stripped === expectedJoined) return { passed: true, matchStrategy: "stripped-prompts" };
+
+  // Last resort: whitespace-collapsed token equality after stripping prompts.
+  if (tokenize(stripPromptLines(actual).join(" ")) === tokenize(expected.join(" ")) && expectedJoined !== "") {
+    return { passed: true, matchStrategy: "tokens" };
+  }
+
+  return { passed: false };
 }
 
 async function runOne(
@@ -114,12 +170,14 @@ export async function POST(request: Request) {
     const { r } = s.value;
     const actual = normalizeOutput(r.output);
     const expected = normalizeOutput(tc.expectedOutput ?? "");
+    const compare = r.exitCode === 0 ? compareOutputs(actual, expected) : { passed: false };
     return {
       index: i,
       input: tc.input ?? "",
       expectedOutput: expected,
       actualOutput: actual,
-      passed: r.exitCode === 0 && actual === expected,
+      passed: compare.passed,
+      matchStrategy: compare.matchStrategy,
       exitCode: r.exitCode,
       stderr: r.stderr,
       compileError: r.compileError,
